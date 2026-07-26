@@ -10,6 +10,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build:web": "expo export -p web",
     "firebase:login": "firebase login",
     "firebase:use": "firebase use --add",
     "firebase:deploy": "firebase deploy --only firestore",

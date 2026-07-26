@@ -126,8 +126,6 @@ import {
   updateOpportunityStatus,
   respondToOpportunity,
 } from "./services/firestoreData";
-import archivedScorerRecords from "./data/scorers.json";
-import { getMatchdayLineup } from "./data/matchday";
 import { fetchLiveScores, liveRecordToFixture } from "./services/liveScores";
 import { rankOpponentCandidates } from "./services/communityAlgorithms";
 import { rankRefereeAssignments } from "./services/roleAlgorithms";
@@ -205,6 +203,14 @@ const conversationIsUnread = (conversation, uid) =>
       conversation.lastMessageSenderId !== uid &&
       !(conversation.readBy || []).includes(uid),
   );
+const getMatchdayLineup = () => ({
+  exactMatch: false,
+  context: "No lineup has been reported for this fixture.",
+  starting: [],
+  substitutes: [],
+  captain: "",
+  coach: "",
+});
 
 async function choosePlayerClip(data, update) {
   if ((data.videos || []).length >= 8)
