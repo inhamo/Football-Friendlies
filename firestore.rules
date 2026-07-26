@@ -1,0 +1,605 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function teamAdmin(teamId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/teams/$(teamId))
+        && request.auth.uid in get(
+          /databases/$(database)/documents/teams/$(teamId)
+        ).data.adminIds;
+    }
+
+    function teamAdminAfter(teamId) {
+      return signedIn()
+        && existsAfter(/databases/$(database)/documents/teams/$(teamId))
+        && request.auth.uid in getAfter(
+          /databases/$(database)/documents/teams/$(teamId)
+        ).data.adminIds;
+    }
+
+    function teamMember(teamId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/teams/$(teamId))
+        && request.auth.uid in get(
+          /databases/$(database)/documents/teams/$(teamId)
+        ).data.memberIds;
+    }
+
+    function teamManager(teamId) {
+      return teamAdmin(teamId)
+        || (
+          signedIn()
+          && exists(/databases/$(database)/documents/teams/$(teamId))
+          && "captainIds" in get(
+            /databases/$(database)/documents/teams/$(teamId)
+          ).data
+          && request.auth.uid in get(
+            /databases/$(database)/documents/teams/$(teamId)
+          ).data.captainIds
+        )
+        || (
+          signedIn()
+          && exists(/databases/$(database)/documents/teams/$(teamId))
+          && "coachIds" in get(
+            /databases/$(database)/documents/teams/$(teamId)
+          ).data
+          && request.auth.uid in get(
+            /databases/$(database)/documents/teams/$(teamId)
+          ).data.coachIds
+        );
+    }
+
+    function matchTeamManager(matchData) {
+      return matchData.participantTeamIds is list
+        && matchData.participantTeamIds.size() == 2
+        && (
+          teamManager(matchData.participantTeamIds[0])
+          || teamManager(matchData.participantTeamIds[1])
+        );
+    }
+
+    function verifiedMatchStatsUpdate(teamId) {
+      return signedIn()
+        && request.resource.data.lastStatsMatchId is string
+        && getAfter(
+          /databases/$(database)/documents/matches/$(request.resource.data.lastStatsMatchId)
+        ).data.status == "completed"
+        && request.auth.uid in getAfter(
+          /databases/$(database)/documents/matches/$(request.resource.data.lastStatsMatchId)
+        ).data.participantUserIds
+        && teamId in getAfter(
+          /databases/$(database)/documents/matches/$(request.resource.data.lastStatsMatchId)
+        ).data.participantTeamIds
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "stats",
+          "statsByCompetition",
+          "lastStatsMatchId",
+          "updatedAt"
+        ]);
+    }
+
+    function leagueAdmin(leagueId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/leagues/$(leagueId))
+        && request.auth.uid in get(
+          /databases/$(database)/documents/leagues/$(leagueId)
+        ).data.adminIds;
+    }
+
+    function conversationMember(conversationId) {
+      return signedIn()
+        && exists(
+          /databases/$(database)/documents/conversations/$(conversationId)
+        )
+        && (
+          request.auth.uid in get(
+            /databases/$(database)/documents/conversations/$(conversationId)
+          ).data.participantIds
+          || (
+            get(
+              /databases/$(database)/documents/conversations/$(conversationId)
+            ).data.scope == "team"
+            && teamMember(
+              get(
+                /databases/$(database)/documents/conversations/$(conversationId)
+              ).data.teamId
+            )
+          )
+        );
+    }
+
+    match /users/{uid} {
+      allow create: if isOwner(uid);
+      allow read, update, delete: if isOwner(uid);
+
+      match /private/{documentId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    match /publicProfiles/{profileId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && !request.resource.data.keys().hasAny([
+          "phone",
+          "phoneNumber",
+          "email",
+          "address",
+          "preciseAddress",
+          "guardianName",
+          "guardianContact",
+          "emergencyContact",
+          "dateOfBirth"
+        ]);
+      allow update, delete: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && (
+          request.method == "delete"
+          || !request.resource.data.keys().hasAny([
+            "phone",
+            "phoneNumber",
+            "email",
+            "address",
+            "preciseAddress",
+            "guardianName",
+            "guardianContact",
+            "emergencyContact",
+            "dateOfBirth"
+          ])
+        );
+    }
+
+    match /teams/{teamId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.auth.uid in request.resource.data.adminIds
+        && request.auth.uid in request.resource.data.memberIds;
+      allow update: if teamAdmin(teamId) || verifiedMatchStatsUpdate(teamId);
+      allow delete: if teamAdmin(teamId);
+    }
+
+    match /teamMembers/{membershipId} {
+      allow read: if signedIn()
+        && (
+          teamMember(resource.data.teamId)
+          || isOwner(resource.data.userId)
+        );
+      allow create: if signedIn()
+        && teamAdminAfter(request.resource.data.teamId);
+      allow update, delete: if teamManager(resource.data.teamId)
+        || isOwner(resource.data.userId);
+    }
+
+    match /playerAssignments/{playerId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.userId == playerId
+        && teamAdmin(request.resource.data.teamId);
+      allow update, delete: if teamManager(resource.data.teamId);
+    }
+
+    match /matchRequests/{requestId} {
+      allow read: if signedIn()
+        && (
+          isOwner(resource.data.ownerId)
+          || request.auth.uid in resource.data.recipientUserIds
+        );
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if signedIn()
+        && (
+          isOwner(resource.data.ownerId)
+          || request.auth.uid in resource.data.recipientUserIds
+        );
+    }
+
+    match /matches/{matchId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if signedIn()
+        && (
+          resource.data.createdBy == request.auth.uid
+          || (
+            request.auth.uid in resource.data.participantUserIds
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                "refereeId",
+                "refereeName",
+                "proposedRefereeFee",
+                "refereeFee",
+                "refereeStatus",
+                "refereeRequestedByTeamId",
+                "refereeTeamApprovalIds",
+                "refereeApprovedBy"
+              ])
+              || matchTeamManager(resource.data)
+            )
+          )
+          || resource.data.refereeId == request.auth.uid
+        );
+      allow delete: if signedIn()
+        && resource.data.createdBy == request.auth.uid;
+    }
+
+    match /matchReviews/{reviewId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.auth.uid in get(
+          /databases/$(database)/documents/matches/$(request.resource.data.matchId)
+        ).data.participantUserIds;
+      allow update, delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /availabilityPosts/{postId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /lineups/{lineupId} {
+      allow read: if teamMember(resource.data.teamId);
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.ownerId)
+        || teamAdmin(resource.data.teamId);
+    }
+
+    match /appearanceClaims/{claimId} {
+      allow read: if signedIn()
+        && (
+          isOwner(resource.data.playerId)
+          || request.auth.uid in resource.data.reviewerIds
+        );
+      allow create: if signedIn()
+        && request.resource.data.playerId == request.auth.uid
+        && request.resource.data.status == "awaiting_confirmation";
+      allow update: if signedIn()
+        && (
+          (
+            isOwner(resource.data.playerId)
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.official == resource.data.official
+          )
+          || request.auth.uid in resource.data.reviewerIds
+        );
+      allow delete: if isOwner(resource.data.playerId);
+    }
+
+    match /conversations/{conversationId} {
+      allow read: if conversationMember(conversationId);
+      allow create: if signedIn()
+        && request.auth.uid in request.resource.data.participantIds
+        && (
+          (
+            request.resource.data.scope == "team"
+            && request.resource.data.teamId is string
+            && teamMember(request.resource.data.teamId)
+          )
+          || (
+            request.resource.data.scope == "player"
+            && request.resource.data.teamId is string
+            && teamAdmin(request.resource.data.teamId)
+          )
+          || (
+            request.resource.data.scope == "direct"
+            && request.resource.data.participantIds is list
+            && request.resource.data.participantIds.size() >= 2
+            && request.resource.data.participantIds.size() <= 3
+          )
+          || (
+            (
+              request.resource.data.scope == "captains"
+              || request.resource.data.scope == "match"
+            )
+            && request.resource.data.teamIds is list
+            && request.resource.data.teamIds.size() == 2
+            && (
+              teamManager(request.resource.data.teamIds[0])
+              || teamManager(request.resource.data.teamIds[1])
+            )
+          )
+        )
+        && (
+          !("youthParticipantIds" in request.resource.data)
+          || request.resource.data.youthParticipantIds.size() == 0
+          || (
+            request.resource.data.guardianIncluded == true
+            && (
+              (
+                request.resource.data.scope == "player"
+                && teamAdmin(request.resource.data.teamId)
+              )
+              || request.resource.data.participantIds.size() >= 3
+            )
+          )
+        );
+      allow update: if (
+          conversationMember(conversationId)
+          || (
+          signedIn()
+          && (
+            resource.data.scope == "captains"
+            || resource.data.scope == "match"
+          )
+          && (
+            teamManager(resource.data.teamIds[0])
+            || teamManager(resource.data.teamIds[1])
+          )
+        )
+          || (
+          signedIn()
+          && resource.data.scope == "player"
+          && teamAdmin(resource.data.teamId)
+          )
+        )
+        && (
+          !("youthParticipantIds" in request.resource.data)
+          || request.resource.data.youthParticipantIds.size() == 0
+          || (
+            request.resource.data.guardianIncluded == true
+            && (
+              (
+                request.resource.data.scope == "player"
+                && teamAdmin(request.resource.data.teamId)
+              )
+              || request.resource.data.participantIds.size() >= 3
+            )
+          )
+        )
+        && (
+          !("youthParticipantIds" in resource.data)
+          || request.resource.data.youthParticipantIds
+            == resource.data.youthParticipantIds
+        );
+      allow delete: if teamAdmin(resource.data.teamId);
+
+      match /messages/{messageId} {
+        allow read: if conversationMember(conversationId);
+        allow create: if conversationMember(conversationId)
+          && request.resource.data.senderId == request.auth.uid
+          && (
+            !("youthParticipantIds" in get(
+              /databases/$(database)/documents/conversations/$(conversationId)
+            ).data)
+            || get(
+              /databases/$(database)/documents/conversations/$(conversationId)
+            ).data.youthParticipantIds.size() == 0
+            || get(
+              /databases/$(database)/documents/conversations/$(conversationId)
+            ).data.guardianIncluded == true
+          )
+          && (
+            !(
+              "archived" in get(
+                /databases/$(database)/documents/conversations/$(conversationId)
+              ).data
+            )
+            || get(
+              /databases/$(database)/documents/conversations/$(conversationId)
+            ).data.archived != true
+          );
+        allow update, delete: if signedIn()
+          && resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    match /payments/{paymentId} {
+      allow read: if teamMember(resource.data.teamId);
+      allow create: if signedIn()
+        && request.resource.data.teamId is string
+        && teamAdmin(request.resource.data.teamId);
+      allow update, delete: if teamAdmin(resource.data.teamId);
+    }
+
+    match /media/{mediaId} {
+      allow read: if signedIn()
+        && (
+          resource.data.visibility == "public"
+          || isOwner(resource.data.ownerId)
+        );
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /refereeAssignments/{assignmentId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if signedIn()
+        && (
+          resource.data.createdBy == request.auth.uid
+          || resource.data.refereeId == request.auth.uid
+          || (
+            resource.data.teamIds is list
+            && resource.data.teamIds.size() >= 2
+            && (
+              teamManager(resource.data.teamIds[0])
+              || teamManager(resource.data.teamIds[1])
+            )
+          )
+        );
+      allow delete: if signedIn()
+        && resource.data.createdBy == request.auth.uid;
+    }
+
+    match /sponsorships/{sponsorshipId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /scoutReports/{reportId} {
+      allow read, update, delete: if isOwner(resource.data.ownerId);
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /leagues/{leagueId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.auth.uid in request.resource.data.adminIds;
+      allow update: if leagueAdmin(leagueId)
+        || (
+          signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "teamIds",
+            "lastJoinedTeamId",
+            "updatedAt"
+          ])
+          && request.resource.data.lastJoinedTeamId is string
+          && teamManager(request.resource.data.lastJoinedTeamId)
+          && request.resource.data.lastJoinedTeamId
+            in request.resource.data.teamIds
+          && existsAfter(
+            /databases/$(database)/documents/leagueMemberships/$(leagueId + "_" + request.resource.data.lastJoinedTeamId)
+          )
+        );
+      allow delete: if leagueAdmin(leagueId);
+    }
+
+    match /leagueMemberships/{membershipId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && (
+          teamAdmin(request.resource.data.teamId)
+          || leagueAdmin(request.resource.data.leagueId)
+        )
+        && (
+          get(
+            /databases/$(database)/documents/leagues/$(request.resource.data.leagueId)
+          ).data.visibility == "public"
+          || request.auth.uid in get(
+            /databases/$(database)/documents/leagues/$(request.resource.data.leagueId)
+          ).data.invitedUserIds
+          || leagueAdmin(request.resource.data.leagueId)
+        );
+      allow update, delete: if teamAdmin(resource.data.teamId)
+        || leagueAdmin(resource.data.leagueId);
+    }
+
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isOwner(resource.data.ownerId);
+      allow create: if signedIn()
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.ownerId is string;
+    }
+
+    match /communityGrounds/{groundId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isOwner(resource.data.ownerId)
+        || (
+          signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "confirmations",
+            "confirmedByIds",
+            "lastConfirmedBy",
+            "lastConfirmedAt",
+            "updatedAt"
+          ])
+          && request.resource.data.lastConfirmedBy == request.auth.uid
+          && request.resource.data.confirmations
+            == resource.data.confirmations + 1
+          && request.auth.uid in request.resource.data.confirmedByIds
+          && (
+            !("confirmedByIds" in resource.data)
+            || !(request.auth.uid in resource.data.confirmedByIds)
+          )
+        );
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /opportunities/{opportunityId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isOwner(resource.data.ownerId)
+        || (
+          signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "responseCount",
+            "updatedAt"
+          ])
+          && request.resource.data.responseCount
+            == resource.data.responseCount + 1
+        );
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /opportunityResponses/{responseId} {
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow read, update, delete: if isOwner(resource.data.ownerId)
+        || resource.data.opportunityOwnerId == request.auth.uid;
+    }
+
+    match /opportunityReports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.private == true;
+      allow read, update, delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /scoreDisputes/{disputeId} {
+      allow read: if signedIn()
+        && request.auth.uid in resource.data.participantUserIds;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.auth.uid in request.resource.data.participantUserIds;
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.participantUserIds;
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /safeguardingReports/{reportId} {
+      allow read, update, delete: if isOwner(resource.data.ownerId);
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.private == true;
+    }
+
+    match /appSettings/{settingId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    match /webhookSubscriptions/{subscriptionId} {
+      allow read, update, delete: if isOwner(resource.data.ownerId);
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.url is string
+        && request.resource.data.url.matches("^https://.*")
+        && request.resource.data.events is list;
+    }
+
+    match /webhookDeliveries/{deliveryId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
