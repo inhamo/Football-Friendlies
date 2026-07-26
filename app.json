@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Friendlies",
+    "name": "Grassroots",
     "slug": "friendlies-zimbabwe",
     "scheme": "friendlies",
     "version": "1.0.0",
@@ -9,8 +9,8 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
+      "image": "./assets/grassroots-kickoff.png",
+      "resizeMode": "cover",
       "backgroundColor": "#2D0A45"
     },
     "ios": {
@@ -33,7 +33,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Friendlies uses your media library when you choose a football profile or match video.",
+          "photosPermission": "Grassroots uses your media library when you choose a football profile or match video.",
           "microphonePermission": false
         }
       ],
@@ -43,7 +43,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Friendlies to use your location to place your team and home ground on the map."
+          "locationWhenInUsePermission": "Allow Grassroots to use your location to place your team and home ground on the map."
         }
       ]
     ]

@@ -10,7 +10,6 @@ import {
   TextInput,
   StatusBar,
   Animated,
-  Easing,
   AccessibilityInfo,
   Alert,
   PanResponder,
@@ -222,7 +221,7 @@ async function choosePlayerClip(data, update) {
   if (!permission.granted)
     return Alert.alert(
       "Videos permission needed",
-      "Allow Friendlies to choose a football clip from this device.",
+      "Allow Grassroots to choose a football clip from this device.",
     );
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["videos"],
@@ -1225,7 +1224,7 @@ function TeamBadge({ name, onPress, size = 38 }) {
   );
 }
 function BrandHeader({
-  title = "FRIENDLIES",
+  title = "GRASSROOTS",
   notificationCount = 0,
   onNotifications,
 }) {
@@ -2281,7 +2280,7 @@ function ClubPage({ name, close, openMatch }) {
       <View style={s.clubHero}>
         <TeamBadge name={name} size={86} />
         <AppText style={s.clubHeroTitle}>{name}</AppText>
-        <AppText style={s.meta}>FRIENDLIES PREMIERSHIP · ZIMBABWE</AppText>
+        <AppText style={s.meta}>GRASSROOTS PREMIERSHIP · ZIMBABWE</AppText>
         {row && (
           <View style={s.clubNumbers}>
             <View>
@@ -2502,7 +2501,7 @@ function MatchDetail({ match, close, openClub, openMatch }) {
         </Pressable>
       </View>
       <AppText style={s.matchMeta}>
-        Friendlies Premiership · Matchday 23{`\n`}
+        Grassroots Premiership · Matchday 23{`\n`}
         {match[0]} · {match[4]}
       </AppText>
       <ScrollView
@@ -2956,7 +2955,7 @@ function MatchDetail({ match, close, openClub, openMatch }) {
               {[
                 ["Kick-off", `${match[0]} at ${match[3]} CAT`],
                 ["Stadium", match[4]],
-                ["Competition", "Friendlies Social Premiership"],
+                ["Competition", "Grassroots Social Premiership"],
                 ["Matchday", "23"],
               ].map((x) => (
                 <View style={s.detailRow} key={x[0]}>
@@ -3874,7 +3873,7 @@ function CommunityHome({
             </View>
             <View style={{ flex: 1 }}>
               <AppText style={s.homeGreeting}>
-                {hasTeam ? team.name : "Welcome to Friendlies"}
+                {hasTeam ? team.name : "Welcome to Grassroots"}
               </AppText>
               <AppText style={s.homeTeamMeta}>
                 {hasTeam ? team.area : "Your football space is ready"}
@@ -4226,7 +4225,7 @@ function TeamHub({
                 <Ionicons name="search-outline" size={30} color={C.muted} />
                 <AppText style={s.team}>Find your team</AppText>
                 <AppText style={s.body}>
-                  Search teams already using Friendlies and request to join.
+                  Search teams already using Grassroots and request to join.
                 </AppText>
               </View>
               <TextInput
@@ -9470,7 +9469,7 @@ function LegacyCreateLeagueScreen({ close, onCreateLeague }) {
           style={s.settingRow}
         >
           <View style={{ flex: 1 }}>
-            <AppText style={s.team}>Prefer sponsors using Friendlies</AppText>
+            <AppText style={s.team}>Prefer sponsors using Grassroots</AppText>
             <AppText style={s.meta}>
               In-app sponsors appear first when reviewing proposals
             </AppText>
@@ -9608,7 +9607,7 @@ function LegacyCreateLeagueScreen({ close, onCreateLeague }) {
           <View style={{ flex: 1 }}>
             <AppText style={s.team}>Prefer in-app sponsors</AppText>
             <AppText style={s.meta}>
-              Sponsors with saved Friendlies profiles appear first
+              Sponsors with saved Grassroots profiles appear first
             </AppText>
           </View>
           <View
@@ -10040,7 +10039,7 @@ function CreateLeagueScreen({ close, onCreateLeague, publicProfiles = [] }) {
           <View style={{ flex: 1 }}>
             <AppText style={s.team}>Prefer in-app sponsors</AppText>
             <AppText style={s.meta}>
-              Sponsors with saved Friendlies profiles appear first
+              Sponsors with saved Grassroots profiles appear first
             </AppText>
           </View>
           <View
@@ -13503,7 +13502,7 @@ function MoreDetail({
                 <AppText style={s.team}>No matching players</AppText>
                 <AppText style={s.body}>
                   Players with saved profiles will appear here. Use an invite
-                  only when the player is not already using Friendlies.
+                  only when the player is not already using Grassroots.
                 </AppText>
               </View>
             ) : null}
@@ -13737,7 +13736,7 @@ function MoreDetail({
                   One active league per match day
                 </AppText>
                 <AppText style={s.body}>
-                  Friendlies checks fixture, registration and payment conflicts
+                  Grassroots checks fixture, registration and payment conflicts
                   before a request is sent.
                 </AppText>
               </View>
@@ -14007,7 +14006,7 @@ function RoleToolScreen({
   const [sent, setSent] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState(null);
-  const [moneyOwner, setMoneyOwner] = useState("Friendlies managed");
+  const [moneyOwner, setMoneyOwner] = useState("Grassroots managed");
   const [assignment, setAssignment] = useState("Pending");
   const [joinRequests, setJoinRequests] = useState([]);
   const [report, setReport] = useState({
@@ -14020,7 +14019,7 @@ function RoleToolScreen({
   const [submitted, setSubmitted] = useState(false);
   const descriptions = {
     "Club Wallet": "Track team dues, expenses and sponsor money.",
-    "Invite People": "Bring players, coaches and referees into Friendlies.",
+    "Invite People": "Bring players, coaches and referees into Grassroots.",
     "My Player Card": "Your verified football identity and playing record.",
     Availability: "Tell the coach when you can train and play.",
     "Find a Team": "Discover teams that fit your position and location.",
@@ -14086,7 +14085,7 @@ function RoleToolScreen({
           <View style={s.moneyOwnership}>
             {[
               [
-                "Friendlies managed",
+                "Grassroots managed",
                 "Payments, receipts and payouts stay inside the app",
                 "shield-checkmark-outline",
               ],
@@ -14126,9 +14125,9 @@ function RoleToolScreen({
               size={21}
             />
             <AppText style={s.body}>
-              {moneyOwner === "Friendlies managed"
-                ? "Friendlies can collect dues and merchandise payments, then pay the team after the settlement period."
-                : "Friendlies will never hold or move team funds; the app only keeps your ledger."}
+              {moneyOwner === "Grassroots managed"
+                ? "Grassroots can collect dues and merchandise payments, then pay the team after the settlement period."
+                : "Grassroots will never hold or move team funds; the app only keeps your ledger."}
             </AppText>
           </View>
           <View style={s.quickMoneyActions}>
@@ -14342,7 +14341,7 @@ function RoleToolScreen({
                 await Clipboard.setStringAsync(link);
                 Alert.alert(
                   "Team link copied",
-                  `This link opens ${team.name} in Friendlies so the person can request to join:\n\n${link}`,
+                  `This link opens ${team.name} in Grassroots so the person can request to join:\n\n${link}`,
                 );
               }}
             >
@@ -16144,7 +16143,7 @@ function More({
           onPress={onSignOut}
           style={s.moreSignOut}
           accessibilityRole="button"
-          accessibilityLabel="Sign out of Friendlies"
+          accessibilityLabel="Sign out of Grassroots"
         >
           <Ionicons name="log-out-outline" size={20} color={C.white} />
           <View style={{ flex: 1 }}>
@@ -16159,63 +16158,69 @@ function More({
   );
 }
 function AppLoader() {
-  const spin = useRef(new Animated.Value(0)).current;
-  const pulse = useRef(new Animated.Value(0.82)).current;
+  const reveal = useRef(new Animated.Value(0)).current;
+  const progress = useRef(new Animated.Value(0.08)).current;
   useEffect(() => {
-    let loop;
     let mounted = true;
     AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
-      if (!mounted || reduceMotion) {
-        pulse.setValue(1);
+      if (!mounted) return;
+      if (reduceMotion) {
+        reveal.setValue(1);
+        progress.setValue(1);
         return;
       }
-      loop = Animated.loop(
-        Animated.parallel([
-          Animated.sequence([
-            Animated.timing(pulse, {
-              toValue: 1,
-              duration: 650,
-              useNativeDriver: Platform.OS !== "web",
-            }),
-            Animated.timing(pulse, {
-              toValue: 0.82,
-              duration: 650,
-              useNativeDriver: Platform.OS !== "web",
-            }),
-          ]),
-          Animated.timing(spin, {
-            toValue: 1,
-            duration: 1800,
-            easing: Easing.linear,
-            useNativeDriver: Platform.OS !== "web",
-          }),
-        ]),
-      );
-      loop.start();
+      Animated.parallel([
+        Animated.timing(reveal, {
+          toValue: 1,
+          duration: 420,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(progress, {
+          toValue: 1,
+          duration: 1300,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ]).start();
     });
     return () => {
       mounted = false;
-      loop?.stop();
     };
   }, []);
-  const rotate = spin.interpolate({
+  const imageScale = reveal.interpolate({
     inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
+    outputRange: [1.035, 1],
   });
   return (
     <View style={s.loader}>
       <StatusBar barStyle="light-content" />
-      <Animated.View style={[s.loaderRing, { transform: [{ rotate }] }]} />
-      <Animated.View style={[s.loaderBrand, { transform: [{ scale: pulse }] }]}>
-        <AppText style={s.loaderBrandText}>F</AppText>
+      <Animated.Image
+        source={require("./assets/grassroots-kickoff.png")}
+        resizeMode="cover"
+        style={[
+          s.loaderImage,
+          { opacity: reveal, transform: [{ scale: imageScale }] },
+        ]}
+      />
+      <View style={s.loaderShade} />
+      <Animated.View style={[s.loaderContent, { opacity: reveal }]}>
+        <View style={s.loaderWordmark}>
+          <View style={s.loaderMark}>
+            <AppText style={s.loaderMarkText}>G</AppText>
+          </View>
+          <AppText style={s.loaderTitle}>GRASSROOTS</AppText>
+        </View>
+        <View style={s.loaderMessage}>
+          <AppText style={s.loaderHeadline}>Football starts here.</AppText>
+          <AppText style={s.loaderSub}>
+            ZIMBABWE · BUILT FROM THE GROUND UP
+          </AppText>
+          <View style={s.loaderTrack}>
+            <Animated.View
+              style={[s.loaderBar, { transform: [{ scaleX: progress }] }]}
+            />
+          </View>
+        </View>
       </Animated.View>
-      <AppText style={s.loaderTitle}>FRIENDLIES</AppText>
-      <AppText style={s.loaderSub}>ZIMBABWE · OUR FOOTBALL</AppText>
-      <View style={s.loaderTrack}>
-        <Animated.View
-          style={[s.loaderBar, { transform: [{ scaleX: pulse }] }]}
-        />
-      </View>
     </View>
   );
 }
@@ -16301,7 +16306,7 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
               <AppText style={s.authMarkText}>F</AppText>
             </View>
             <View>
-              <AppText style={s.authBrand}>FRIENDLIES</AppText>
+              <AppText style={s.authBrand}>GRASSROOTS</AppText>
               <AppText style={s.authBrandSub}>ZIMBABWE · OUR FOOTBALL</AppText>
             </View>
           </View>
@@ -16641,7 +16646,7 @@ function RefereeProfile({ data, update, onSave }) {
     if (!permission.granted)
       return Alert.alert(
         "Photos permission needed",
-        "Allow Friendlies to choose an ID portrait.",
+        "Allow Grassroots to choose an ID portrait.",
       );
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -17475,7 +17480,7 @@ function PublicProfilePreview({ role, data, view, setView, onEdit }) {
         />
         <Pressable
           onPress={() =>
-            Alert.alert("Profile link ready", `Share ${title} on Friendlies.`)
+            Alert.alert("Profile link ready", `Share ${title} on Grassroots.`)
           }
           style={s.saveLineupButton}
         >
@@ -17635,7 +17640,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
     if (!permission.granted)
       return Alert.alert(
         "Photos permission needed",
-        "Allow Friendlies to choose a profile image.",
+        "Allow Grassroots to choose a profile image.",
       );
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -19237,7 +19242,7 @@ function RoleWorkspace({
                 </AppText>
                 <AppText style={s.meta}>
                   {league.preferAppCreators
-                    ? "Friendlies sponsors reviewed first"
+                    ? "Grassroots sponsors reviewed first"
                     : "Open sponsorship review"}
                 </AppText>
                 <Pressable
@@ -19946,7 +19951,7 @@ function RoleWorkspace({
             onPress={onSignOut}
             style={s.moreSignOut}
             accessibilityRole="button"
-            accessibilityLabel="Sign out of Friendlies"
+            accessibilityLabel="Sign out of Grassroots"
           >
             <Ionicons name="log-out-outline" size={20} color={C.white} />
             <View style={{ flex: 1 }}>
@@ -20149,13 +20154,14 @@ function App() {
   }, []);
   useEffect(() => {
     const assets = [
+      require("./assets/grassroots-kickoff.png"),
       ...Object.values(clubLogos),
       require("./assets/dynamos-match.jpg"),
       ...signingNews.map((n) => n.image),
     ];
     Promise.all([
       Asset.loadAsync(assets),
-      new Promise((r) => setTimeout(r, 550)),
+      new Promise((r) => setTimeout(r, 900)),
     ]).finally(() => setReady(true));
   }, []);
   useEffect(() => {
@@ -20627,7 +20633,7 @@ function App() {
       const confirmed =
         typeof globalThis.confirm === "function"
           ? globalThis.confirm(
-              "Sign out of Friendlies? Your saved account information will remain available.",
+              "Sign out of Grassroots? Your saved account information will remain available.",
             )
           : true;
       if (confirmed)
@@ -22244,58 +22250,89 @@ const s = StyleSheet.create({
   },
   loader: {
     flex: 1,
-    backgroundColor: C.red,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loaderRing: {
-    position: "absolute",
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    borderWidth: 2,
-    borderColor: "#ffffff33",
-    borderTopColor: "white",
-  },
-  loaderLogo: { width: 96, height: 110 },
-  loaderBrand: {
-    width: 104,
-    height: 112,
-    borderRadius: 28,
+    minHeight: 480,
     backgroundColor: C.redDark,
-    borderWidth: 3,
-    borderColor: C.gold,
+    overflow: "hidden",
+  },
+  loaderImage: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+  },
+  loaderShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#170A24A8",
+  },
+  loaderContent: {
+    flex: 1,
+    minHeight: 480,
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === "ios" ? 62 : 34,
+    paddingBottom: Platform.OS === "ios" ? 48 : 30,
+    justifyContent: "space-between",
+  },
+  loaderWordmark: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  loaderMark: {
+    width: 36,
+    height: 40,
+    borderRadius: 9,
+    backgroundColor: C.gold,
     alignItems: "center",
     justifyContent: "center",
   },
-  loaderBrandText: { color: C.white, fontSize: 52, fontFamily: F.black },
+  loaderMarkText: {
+    color: C.redDark,
+    fontSize: 22,
+    fontFamily: F.black,
+  },
   loaderTitle: {
-    color: "white",
-    fontSize: 28,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-    marginTop: 34,
+    color: C.white,
+    fontSize: 21,
+    lineHeight: 25,
+    fontFamily: F.black,
+    letterSpacing: 0.3,
+  },
+  loaderMessage: {
+    maxWidth: 340,
+    paddingBottom: 4,
+  },
+  loaderHeadline: {
+    color: C.white,
+    fontSize: 35,
+    lineHeight: 38,
+    fontFamily: F.black,
+    letterSpacing: -1.1,
   },
   loaderSub: {
-    color: "#ffffffaa",
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 2,
-    marginTop: 6,
+    color: "#F3EEF8",
+    fontSize: 10,
+    lineHeight: 14,
+    fontFamily: F.bold,
+    letterSpacing: 0.8,
+    marginTop: 10,
   },
   loaderTrack: {
-    width: 120,
-    height: 3,
-    backgroundColor: "#ffffff30",
-    borderRadius: 9,
-    marginTop: 26,
+    width: "100%",
+    maxWidth: 240,
+    height: 4,
+    backgroundColor: "#FFFFFF3D",
+    borderRadius: 2,
+    marginTop: 20,
     overflow: "hidden",
   },
   loaderBar: {
     width: "100%",
-    height: 3,
-    backgroundColor: "white",
-    borderRadius: 9,
+    height: 4,
+    backgroundColor: C.gold,
+    borderRadius: 2,
   },
   seasonHead: { backgroundColor: C.red, paddingBottom: 26 },
   seasonTitle: {
