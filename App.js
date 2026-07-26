@@ -20113,6 +20113,7 @@ function App() {
   const [sharedLeagueId, setSharedLeagueId] = useState(null);
   const [ready, setReady] = useState(false);
   const [fontsLoaded] = useFonts({
+    ...ExpoIonicons.font,
     Archivo_400Regular,
     Archivo_500Medium,
     Archivo_600SemiBold,
