@@ -20,9 +20,9 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import ExpoIonicons from "@expo/vector-icons/Ionicons";
 import { Asset } from "expo-asset";
 import { useFonts } from "expo-font";
+import AppIcon, { APP_ICON_ASSETS } from "./components/AppIcon";
 import AsyncStorage from "./services/storage";
 import * as ImagePicker from "expo-image-picker";
 import * as Clipboard from "expo-clipboard";
@@ -161,16 +161,19 @@ function AppText({ style, ...props }) {
 }
 
 function Ionicons({ name, ...props }) {
-  if (
-    name === "arrow-forward" ||
-    name === "chevron-forward" ||
-    name === "chevron-back" ||
-    name === "swap-horizontal" ||
-    name === "swap-vertical"
-  )
-    return null;
+  return <AppIcon {...props} name={name} />;
+}
+
+function Icons8Credit() {
   return (
-    <ExpoIonicons {...props} name={name === "arrow-back" ? "close" : name} />
+    <Pressable
+      onPress={() => Linking.openURL("https://icons8.com")}
+      accessibilityRole="link"
+      accessibilityLabel="Icons provided by Icons8"
+      style={s.icons8Credit}
+    >
+      <AppText style={s.icons8CreditText}>Icons by Icons8</AppText>
+    </Pressable>
   );
 }
 
@@ -16153,6 +16156,7 @@ function More({
             </AppText>
           </View>
         </Pressable>
+        <Icons8Credit />
       </View>
     </ScrollView>
   );
@@ -19961,6 +19965,7 @@ function RoleWorkspace({
               </AppText>
             </View>
           </Pressable>
+          <Icons8Credit />
         </View>
       </ScrollView>
     );
@@ -20113,7 +20118,6 @@ function App() {
   const [sharedLeagueId, setSharedLeagueId] = useState(null);
   const [ready, setReady] = useState(false);
   const [fontsLoaded] = useFonts({
-    ...ExpoIonicons.font,
     Archivo_400Regular,
     Archivo_500Medium,
     Archivo_600SemiBold,
@@ -20156,6 +20160,7 @@ function App() {
   useEffect(() => {
     const assets = [
       require("./assets/grassroots-kickoff.png"),
+      ...APP_ICON_ASSETS,
       ...Object.values(clubLogos),
       require("./assets/dynamos-match.jpg"),
       ...signingNews.map((n) => n.image),
@@ -26539,6 +26544,18 @@ const s = StyleSheet.create({
     color: "#FBE9EC",
     fontSize: 11,
     marginTop: 3,
+  },
+  icons8Credit: {
+    alignSelf: "center",
+    minHeight: 40,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  icons8CreditText: {
+    color: C.muted,
+    fontSize: 11,
+    textDecorationLine: "underline",
   },
   conversationMessages: {
     flexGrow: 1,

@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import AppIcon from "./AppIcon";
 
 const toDate = (value) => {
   if (!value) return new Date();
@@ -68,7 +68,7 @@ export default function DateField({
         <Text style={[styles.value, !value && styles.placeholder]}>
           {displayDate(value)}
         </Text>
-        <Ionicons name="calendar-outline" size={20} color="#6C2BEA" />
+        <AppIcon name="calendar-outline" size={20} color="#6C2BEA" />
       </Pressable>
       {Platform.OS === "android" && open ? picker : null}
       {Platform.OS === "ios" ? (
