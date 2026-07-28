@@ -177,6 +177,23 @@ function Icons8Credit() {
   );
 }
 
+function SignOutAction({ onSignOut, compact = false }) {
+  return (
+    <Pressable
+      onPress={onSignOut}
+      style={[s.moreSignOut, compact && s.moreSignOutCompact]}
+      accessibilityRole="button"
+      accessibilityLabel="Sign out of Grassroots"
+    >
+      <Ionicons name="log-out-outline" size={20} color={C.white} />
+      <View style={{ flex: 1 }}>
+        <AppText style={s.moreSignOutTitle}>Sign out</AppText>
+        <AppText style={s.moreSignOutCopy}>Return to the sign-in screen</AppText>
+      </View>
+    </Pressable>
+  );
+}
+
 const numbersOnly = (value) => value.replace(/[^0-9]/g, "");
 const formatStoredDate = (value) => {
   if (!value) return "Not selected";
@@ -19055,7 +19072,7 @@ function RoleWorkspace({
         </View>
       </ScrollView>
     );
-  if (section === "More")
+  if (section === "Chat")
     return (
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         <RoleHeader role={role} title="Messages and appointments" />
@@ -19881,12 +19898,13 @@ function RoleWorkspace({
     );
   if (section === "More")
     return (
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 28 }}
-      >
-        <RoleHeader role={role} title="Account & tools" />
-        <View style={s.communityListSection}>
+      <View style={s.roleMorePage}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 12 }}
+        >
+          <RoleHeader role={role} title="Account & tools" />
+          <View style={s.communityListSection}>
           <RoleAction
             icon="person-circle-outline"
             title={`${role} profile`}
@@ -19951,23 +19969,13 @@ function RoleWorkspace({
               label="VIEW"
             />
           ) : null}
-          <Pressable
-            onPress={onSignOut}
-            style={s.moreSignOut}
-            accessibilityRole="button"
-            accessibilityLabel="Sign out of Grassroots"
-          >
-            <Ionicons name="log-out-outline" size={20} color={C.white} />
-            <View style={{ flex: 1 }}>
-              <AppText style={s.moreSignOutTitle}>Sign out</AppText>
-              <AppText style={s.moreSignOutCopy}>
-                Return to the sign-in screen
-              </AppText>
-            </View>
-          </Pressable>
+          </View>
+        </ScrollView>
+        <View style={s.roleMoreFooter}>
+          <SignOutAction onSignOut={onSignOut} compact />
           <Icons8Credit />
         </View>
-      </ScrollView>
+      </View>
     );
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
@@ -26544,6 +26552,21 @@ const s = StyleSheet.create({
     color: "#FBE9EC",
     fontSize: 11,
     marginTop: 3,
+  },
+  moreSignOutCompact: {
+    marginTop: 0,
+    marginBottom: 0,
+  },
+  roleMorePage: {
+    flex: 1,
+  },
+  roleMoreFooter: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 2,
+    backgroundColor: C.cream,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.line,
   },
   icons8Credit: {
     alignSelf: "center",
