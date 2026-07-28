@@ -20,6 +20,12 @@ import {
   firestore,
 } from "./firebaseClient";
 import { FIREBASE_CONFIGURATION_ERROR } from "./firebaseConfig";
+import {
+  isPhoneAuthEmail,
+  normalizeZimbabwePhone,
+  phoneNumberFromAuthEmail,
+  resolvePasswordAuthEmail,
+} from "./accountIdentifiers";
 
 const allowedRoles = new Set([
   "Coach",
@@ -44,11 +50,11 @@ function safeRoles(roles, primaryRole) {
 function readableAuthError(error) {
   switch (error?.code) {
     case "auth/email-already-in-use":
-      return "An account with this email already exists.";
+      return "An account with these details already exists.";
     case "auth/invalid-credential":
     case "auth/user-not-found":
     case "auth/wrong-password":
-      return "The email or password is incorrect.";
+      return "The phone number, email or password is incorrect.";
     case "auth/invalid-email":
       return "Enter a valid email address.";
     case "auth/weak-password":
@@ -70,15 +76,26 @@ async function readUserProfile(uid) {
 async function writeUserProfile(user, values = {}) {
   const primaryRole = safeRole(values.primaryRole);
   const roles = safeRoles(values.roles, primaryRole);
+  const phoneNumber =
+    normalizeZimbabwePhone(values.phoneNumber) ||
+    phoneNumberFromAuthEmail(user.email);
+  const email =
+    values.email ||
+    (isPhoneAuthEmail(user.email) ? "" : user.email) ||
+    "";
   await setDoc(
     doc(firestore, "users", user.uid),
     {
       displayName: values.displayName || user.displayName || "",
-      email: user.email || values.email || null,
-      phoneNumber: values.phoneNumber || null,
+      email: email || null,
+      phoneNumber: phoneNumber || null,
       primaryRole,
       roles,
-      authProvider: user.isAnonymous ? "anonymous" : "password",
+      authProvider: user.isAnonymous
+        ? "anonymous"
+        : phoneNumber
+          ? "phone_password"
+          : "email_password",
       updatedAt: serverTimestamp(),
       ...(values.createdAt ? { createdAt: values.createdAt } : {}),
     },
@@ -112,13 +129,17 @@ function guestSession(user, role) {
 
 function accountSession(user, profile) {
   const role = safeRole(profile?.primaryRole);
+  const phoneNumber =
+    normalizeZimbabwePhone(profile?.phoneNumber) ||
+    phoneNumberFromAuthEmail(user.email);
   return {
     type: "account",
     user: {
       id: user.uid,
       name: profile?.displayName || user.displayName || "",
-      email: user.email || "",
-      phoneNumber: profile?.phoneNumber || "",
+      email:
+        profile?.email || (isPhoneAuthEmail(user.email) ? "" : user.email) || "",
+      phoneNumber,
       role,
       roles: safeRoles(profile?.roles, role),
     },
@@ -146,21 +167,31 @@ export async function createGuestSession(role) {
   }
 }
 
-export async function createAccount({ name, email, password, role }) {
+export async function createAccount({
+  name,
+  email = "",
+  phoneNumber = "",
+  password,
+  role,
+}) {
   if (!firebaseConfigured) throw new Error(FIREBASE_CONFIGURATION_ERROR);
   try {
-    const credential = EmailAuthProvider.credential(email.trim(), password);
+    const normalizedPhone = normalizeZimbabwePhone(phoneNumber);
+    const authEmail = resolvePasswordAuthEmail(normalizedPhone || email);
+    const credential = EmailAuthProvider.credential(authEmail, password);
     const currentUser = firebaseAuth.currentUser;
     const result = currentUser?.isAnonymous
       ? await linkWithCredential(currentUser, credential)
       : await createUserWithEmailAndPassword(
           firebaseAuth,
-          email.trim(),
+          authEmail,
           password,
         );
     await updateProfile(result.user, { displayName: name.trim() });
     let profile = {
       displayName: name.trim(),
+      email: email.trim().toLowerCase(),
+      phoneNumber: normalizedPhone,
       primaryRole: role,
       roles: [role],
     };
@@ -168,6 +199,7 @@ export async function createAccount({ name, email, password, role }) {
       await writeUserProfile(result.user, {
         displayName: name.trim(),
         email: email.trim().toLowerCase(),
+        phoneNumber: normalizedPhone,
         primaryRole: role,
         roles: [role],
         createdAt: serverTimestamp(),
@@ -182,14 +214,22 @@ export async function createAccount({ name, email, password, role }) {
   }
 }
 
-export async function signIn({ email, password }) {
+export async function signIn({
+  identifier = "",
+  email = "",
+  phoneNumber = "",
+  password,
+}) {
   if (!firebaseConfigured) throw new Error(FIREBASE_CONFIGURATION_ERROR);
   try {
+    const authEmail = resolvePasswordAuthEmail(
+      identifier || phoneNumber || email,
+    );
     if (firebaseAuth.currentUser?.isAnonymous)
       await firebaseSignOut(firebaseAuth);
     const result = await signInWithEmailAndPassword(
       firebaseAuth,
-      email.trim(),
+      authEmail,
       password,
     );
     let profile = await readUserProfile(result.user.uid);
@@ -197,6 +237,7 @@ export async function signIn({ email, password }) {
       await writeUserProfile(result.user, {
         displayName: result.user.displayName || "",
         primaryRole: "Player",
+        phoneNumber: phoneNumberFromAuthEmail(authEmail),
         createdAt: serverTimestamp(),
       });
       profile = await readUserProfile(result.user.uid);

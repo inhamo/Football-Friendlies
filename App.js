@@ -128,6 +128,7 @@ import {
 import { fetchLiveScores, liveRecordToFixture } from "./services/liveScores";
 import { rankOpponentCandidates } from "./services/communityAlgorithms";
 import { rankRefereeAssignments } from "./services/roleAlgorithms";
+import { normalizeZimbabwePhone } from "./services/accountIdentifiers";
 
 const Archivo_400Regular = require("@expo-google-fonts/archivo/400Regular/Archivo_400Regular.ttf");
 const Archivo_500Medium = require("@expo-google-fonts/archivo/500Medium/Archivo_500Medium.ttf");
@@ -16256,9 +16257,11 @@ const ENTRY_ROLES = [
 
 function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
   const [mode, setMode] = useState(canClose ? "signup" : "welcome");
-  const [role, setRole] = useState("Player");
+  const [role, setRole] = useState(null);
+  const [contactMethod, setContactMethod] = useState("phone");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -16266,18 +16269,31 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
 
   const submit = async () => {
     setError("");
-    if (!email.trim() || !email.includes("@"))
+    if (contactMethod === "email" && (!email.trim() || !email.includes("@")))
       return setError("Enter a valid email address.");
+    if (contactMethod === "phone" && !normalizeZimbabwePhone(phoneNumber))
+      return setError("Enter a valid Zimbabwe mobile number.");
     if (mode === "signup" && name.trim().length < 2)
       return setError("Tell us the name your football community knows you by.");
+    if (mode === "signup" && !role)
+      return setError("Choose your main football role.");
     if (password.length < 8)
       return setError("Use at least 8 characters for your password.");
     setBusy(true);
     try {
       const session =
         mode === "signup"
-          ? await createAccount({ name, email, password, role })
-          : await signIn({ email, password });
+          ? await createAccount({
+              name,
+              email: contactMethod === "email" ? email : "",
+              phoneNumber: contactMethod === "phone" ? phoneNumber : "",
+              password,
+              role,
+            })
+          : await signIn({
+              identifier: contactMethod === "phone" ? phoneNumber : email,
+              password,
+            });
       onAuthenticated(session);
     } catch (submitError) {
       setError(submitError.message || "Something went wrong. Try again.");
@@ -16307,6 +16323,40 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
               style={[s.authRoleChipText, active && s.authRoleChipTextActive]}
             >
               {itemRole}
+            </AppText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+  const contactPicker = (
+    <View style={s.authContactPicker}>
+      {[
+        ["phone", "Phone number"],
+        ["email", "Email"],
+      ].map(([method, label]) => {
+        const active = contactMethod === method;
+        return (
+          <Pressable
+            key={method}
+            onPress={() => {
+              setError("");
+              setContactMethod(method);
+            }}
+            style={[
+              s.authContactOption,
+              active && s.authContactOptionActive,
+            ]}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: active }}
+          >
+            <AppText
+              style={[
+                s.authContactOptionText,
+                active && s.authContactOptionTextActive,
+              ]}
+            >
+              {label}
             </AppText>
           </Pressable>
         );
@@ -16393,11 +16443,15 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
             <AppText style={s.authQuestion}>What brings you here?</AppText>
             {rolePicker}
             <Pressable
-              style={s.authPrimaryButton}
+              disabled={!role}
+              style={[s.authPrimaryButton, !role && s.authPrimaryButtonDisabled]}
               onPress={() => onGuest(role)}
               accessibilityRole="button"
+              accessibilityState={{ disabled: !role }}
             >
-              <AppText style={s.authPrimaryButtonText}>Preview the app</AppText>
+              <AppText style={s.authPrimaryButtonText}>
+                {role ? `Explore as ${role}` : "Choose a role to explore"}
+              </AppText>
               <Ionicons name="arrow-forward" size={20} color={C.redDark} />
             </Pressable>
             <AppText style={s.authNoPressure}>
@@ -16472,18 +16526,40 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
             </>
           ) : null}
 
-          <AppText style={s.authFieldLabel}>Email</AppText>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            style={s.authInput}
-            placeholder="you@example.com"
-            placeholderTextColor="#756D7D"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <AppText style={s.authFieldLabel}>Use</AppText>
+          {contactPicker}
+          <AppText style={s.authFieldLabel}>
+            {contactMethod === "phone" ? "Zimbabwe mobile number" : "Email"}
+          </AppText>
+          {contactMethod === "phone" ? (
+            <>
+              <TextInput
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                style={s.authInput}
+                placeholder="077 123 4567"
+                placeholderTextColor="#756D7D"
+                keyboardType="phone-pad"
+                textContentType="telephoneNumber"
+                autoComplete="tel"
+              />
+              <AppText style={s.authFieldHelp}>
+                No SMS charge or verification code. Keep your password safe.
+              </AppText>
+            </>
+          ) : (
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              style={s.authInput}
+              placeholder="you@example.com"
+              placeholderTextColor="#756D7D"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          )}
           <AppText style={s.authFieldLabel}>Password</AppText>
           <View style={s.authPasswordField}>
             <TextInput
@@ -20093,7 +20169,7 @@ function App() {
   const [authOpen, setAuthOpen] = useState(false);
   const [cloudHydratedUid, setCloudHydratedUid] = useState(null);
   const [userRole, setUserRole, roleHydrated] = usePersistentState(
-    "friendlies-active-role-v4",
+    "friendlies-active-role-v5",
     null,
   );
   const [roleData, setRoleData, dataHydrated] = usePersistentState(
@@ -25626,6 +25702,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  authPrimaryButtonDisabled: {
+    opacity: 0.5,
+  },
   authPrimaryButtonText: { color: C.redDark, fontSize: 15, fontFamily: F.bold },
   authNoPressure: {
     color: "#D7C8E6",
@@ -25673,6 +25752,31 @@ const s = StyleSheet.create({
     marginBottom: 7,
     marginTop: 18,
   },
+  authContactPicker: {
+    minHeight: 46,
+    padding: 3,
+    borderRadius: 8,
+    backgroundColor: "#E9E4EF",
+    flexDirection: "row",
+  },
+  authContactOption: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  authContactOptionActive: {
+    backgroundColor: C.white,
+  },
+  authContactOptionText: {
+    color: C.muted,
+    fontSize: 13,
+    fontFamily: F.semibold,
+  },
+  authContactOptionTextActive: {
+    color: C.redDark,
+  },
   authInput: {
     minHeight: 50,
     borderRadius: 4,
@@ -25683,6 +25787,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 13,
     fontSize: 15,
     fontFamily: F.regular,
+  },
+  authFieldHelp: {
+    marginTop: 7,
+    color: C.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   authPasswordField: {
     minHeight: 50,
