@@ -16255,7 +16255,7 @@ const ENTRY_ROLES = [
 ];
 
 function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
-  const [mode, setMode] = useState(canClose ? "signup" : "signin");
+  const [mode, setMode] = useState(canClose ? "signup" : "welcome");
   const [role, setRole] = useState("Player");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -20195,9 +20195,8 @@ function App() {
       .catch(() => {});
   }, [authSession, roleHydrated, userRole]);
   useEffect(() => {
-    if (!authSession || userRole) return;
-    const sessionRole =
-      authSession.type === "account" ? authSession.user.role : authSession.role;
+    if (!authSession || userRole || authSession.type !== "account") return;
+    const sessionRole = authSession.user.role;
     if (sessionRole) setUserRole(sessionRole);
   }, [authSession, setUserRole, userRole]);
   useEffect(() => {
