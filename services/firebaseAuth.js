@@ -56,15 +56,15 @@ function readableAuthError(error) {
     case "auth/wrong-password":
       return "The phone number, email or password is incorrect.";
     case "auth/invalid-email":
-      return "Enter a valid email address.";
+      return "The email address has an invalid format.";
     case "auth/weak-password":
-      return "Use a stronger password with at least 8 characters.";
+      return "The password does not meet the minimum security requirement.";
     case "auth/network-request-failed":
-      return "Check your connection and try again.";
+      return "The device could not reach the account service.";
     case "auth/too-many-requests":
-      return "Too many attempts. Wait a little and try again.";
+      return "The account service temporarily paused requests after repeated attempts.";
     default:
-      return "Authentication could not be completed. Please try again.";
+      return "The account service did not complete the request.";
   }
 }
 

@@ -231,6 +231,28 @@ const conversationIsUnread = (conversation, uid) =>
       conversation.lastMessageSenderId !== uid &&
       !(conversation.readBy || []).includes(uid),
   );
+const actionErrorText = (whatHappened, why, action) =>
+  `${whatHappened}\n\nWhy: ${why}\n\nWhat to do: ${action}`;
+const showActionError = (whatHappened, why, action) =>
+  Alert.alert(
+    whatHappened,
+    `Why: ${why}\n\nWhat to do: ${action}`,
+  );
+const holdSuccessState = (milliseconds = 850) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function SaveSuccessNotice({ title, detail }) {
+  if (!title) return null;
+  return (
+    <View style={s.saveSuccessNotice} accessibilityRole="alert">
+      <Ionicons name="checkmark-circle" size={22} color={C.green} />
+      <View style={{ flex: 1 }}>
+        <AppText style={s.saveSuccessTitle}>{title}</AppText>
+        {detail ? <AppText style={s.saveSuccessDetail}>{detail}</AppText> : null}
+      </View>
+    </View>
+  );
+}
 const getMatchdayLineup = () => ({
   exactMatch: false,
   context: "No lineup has been reported for this fixture.",
@@ -248,9 +270,10 @@ async function choosePlayerClip(data, update) {
     );
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted)
-    return Alert.alert(
-      "Videos permission needed",
-      "Allow Grassroots to choose a football clip from this device.",
+    return showActionError(
+      "The video picker did not open.",
+      "Grassroots does not have permission to view videos on this device.",
+      "Allow video access in device settings, then add the clip again.",
     );
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["videos"],
@@ -3794,9 +3817,10 @@ function PostAvailabilityFlow({ close, team, onPublish, matches = [] }) {
                 "Other teams can now find this availability.",
               );
             } catch (error) {
-              Alert.alert(
-                "Couldn’t publish availability",
-                error?.message || "Please check your connection and try again.",
+              showActionError(
+                "Availability was not published.",
+                error?.message || "The save request did not reach the service.",
+                "Check the date, time and connection, then publish again.",
               );
             } finally {
               setPublishing(false);
@@ -4010,7 +4034,13 @@ function TeamHub({
   }, [selectedTeamChat]);
   const create = async () => {
     if (!name.trim() || !area.trim()) {
-      setError("Add the team name and home area.");
+      setError(
+        actionErrorText(
+          "The team was not created.",
+          "The team name or home area is empty.",
+          "Enter both details, then create the team again.",
+        ),
+      );
       return;
     }
     setBusy(true);
@@ -4020,7 +4050,13 @@ function TeamHub({
       setName("");
       setArea("");
     } catch {
-      setError("The team could not be created. Please try again.");
+      setError(
+        actionErrorText(
+          "The team was not created.",
+          "The save request did not finish.",
+          "Check your connection and create the team again.",
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -4170,9 +4206,10 @@ function TeamHub({
                 );
                 setTeamDraft("");
               } catch (error) {
-                Alert.alert(
-                  "Message not sent",
-                  error?.message || "Please try again.",
+                showActionError(
+                  "The message was not sent.",
+                  error?.message || "The chat connection did not complete the send.",
+                  "Check your connection and press Send again.",
                 );
               } finally {
                 setSendingTeamMessage(false);
@@ -4277,9 +4314,10 @@ function TeamHub({
                             `${item.name} can now review your profile.`,
                           );
                         } catch {
-                          Alert.alert(
-                            "Couldn’t send request",
-                            "Please check your connection and try again.",
+                          showActionError(
+                            "The team request was not sent.",
+                            "The request did not finish.",
+                            "Check your connection and send the request again.",
                           );
                         }
                       }}
@@ -4696,7 +4734,7 @@ function RecordMatchWizard({ match, close, finish }) {
   );
 }
 
-function RecordMatchWizardV2({ match, close, finish }) {
+function RecordMatchWizardV2({ match, close, finish, onSaved }) {
   const roster = match.roster || [];
   const correctionResult =
     match.status === "result_disputed"
@@ -4718,7 +4756,9 @@ function RecordMatchWizardV2({ match, close, finish }) {
   const [events, setEvents] = useState(
     Array.isArray(correctionResult?.events) ? correctionResult.events : [],
   );
-  const [submitting, setSubmitting] = useState(false);
+  const [submitState, setSubmitState] = useState("idle");
+  const submitting = submitState === "saving";
+  const scoreSaved = submitState === "saved";
   const [draftReady, setDraftReady] = useState(false);
   useEffect(() => {
     let active = true;
@@ -5137,7 +5177,7 @@ function RecordMatchWizardV2({ match, close, finish }) {
             disabled={submitting}
             onPress={async () => {
               if (submitting) return;
-              setSubmitting(true);
+              setSubmitState("saving");
               const result = {
                 homeScore: Number(homeScore || 0),
                 awayScore: Number(awayScore || 0),
@@ -5147,22 +5187,29 @@ function RecordMatchWizardV2({ match, close, finish }) {
               try {
                 await finish(result);
                 await AsyncStorage.removeItem(offlineDraftKey);
+                setSubmitState("saved");
+                await holdSuccessState();
+                onSaved?.();
               } catch {
-                Alert.alert(
-                  "Saved on this phone",
-                  "The match record is safe here. Submit it again when you have a connection.",
+                setSubmitState("idle");
+                showActionError(
+                  "The match record was saved only on this phone.",
+                  "The connection dropped before the record reached the other team.",
+                  "Reconnect, reopen Match HQ and submit the saved record again.",
                 );
-              } finally {
-                setSubmitting(false);
               }
             }}
-            style={[s.saveLineupButton, submitting && s.buttonDisabled]}
+            style={[
+              s.saveLineupButton,
+              submitting && s.buttonDisabled,
+              scoreSaved && s.saveLineupButtonSaved,
+            ]}
           >
             {submitting ? (
               <ActivityIndicator color={C.white} />
             ) : (
               <Ionicons
-                name="checkmark-circle-outline"
+                name={scoreSaved ? "checkmark-circle" : "checkmark-circle-outline"}
                 color="white"
                 size={18}
               />
@@ -5170,9 +5217,13 @@ function RecordMatchWizardV2({ match, close, finish }) {
             <AppText style={s.saveLineupText}>
               {submitting
                 ? "SAVING SCORE"
-                : match.status === "result_disputed"
-                  ? "SUBMIT CORRECTED SCORE"
-                  : "SUBMIT FOR CONFIRMATION"}
+                : scoreSaved
+                  ? match.status === "result_disputed"
+                    ? "CORRECTED SCORE SAVED"
+                    : "SCORE SENT FOR CONFIRMATION"
+                  : match.status === "result_disputed"
+                    ? "SUBMIT CORRECTED SCORE"
+                    : "SUBMIT FOR CONFIRMATION"}
             </AppText>
           </Pressable>
         </View>
@@ -5181,9 +5232,14 @@ function RecordMatchWizardV2({ match, close, finish }) {
   );
 }
 
-function MatchFlowScreen({ match, close, finish }) {
+function MatchFlowScreen({ match, close, finish, onSaved }) {
   return (
-    <RecordMatchWizardV2 match={match} close={close} finish={finish} />
+    <RecordMatchWizardV2
+      match={match}
+      close={close}
+      finish={finish}
+      onSaved={onSaved}
+    />
   );
 }
 
@@ -5425,6 +5481,7 @@ function FixtureAccountabilityScreen({
   const [proposedTime, setProposedTime] = useState(match.kickoff || "");
   const [rescheduleReason, setRescheduleReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const pendingReschedule =
     match.rescheduleStatus === "pending" &&
     match.rescheduleConfirmationTeamId === team?.id;
@@ -5452,14 +5509,17 @@ function FixtureAccountabilityScreen({
   const canReportNoShow = Number.isFinite(kickoffAt) && Date.now() >= kickoffAt;
   const run = async (action, success) => {
     setBusy(true);
+    setSuccessMessage("");
     try {
       await action();
-      Alert.alert(success, "The fixture record has been updated.");
+      setSuccessMessage(success);
+      await holdSuccessState();
       close();
     } catch (error) {
-      Alert.alert(
-        "Couldn’t update fixture",
-        error?.message || "Please try again.",
+      showActionError(
+        "The fixture was not updated.",
+        error?.message || "The update request did not finish.",
+        "Review the fixture details and try the update again.",
       );
     } finally {
       setBusy(false);
@@ -5479,6 +5539,16 @@ function FixtureAccountabilityScreen({
         </View>
       </View>
       <View style={s.communityListSection}>
+        {busy && !successMessage ? (
+          <View style={s.profilePrivacyNote} accessibilityRole="progressbar">
+            <ActivityIndicator color={C.red} />
+            <AppText style={[s.body, { flex: 1 }]}>Saving fixture change…</AppText>
+          </View>
+        ) : null}
+        <SaveSuccessNotice
+          title={successMessage}
+          detail="The fixture record is now updated for both teams."
+        />
         {pendingReschedule ? (
           <>
             <View style={s.grassrootsLead}>
@@ -5853,6 +5923,7 @@ function PostMatchFeedback({ match, close, onSave }) {
   const [conduct, setConduct] = useState("Praise");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
       <View style={s.subHeader}>
@@ -5910,30 +5981,41 @@ function PostMatchFeedback({ match, close, onSave }) {
           placeholderTextColor={C.muted}
         />
         <Pressable
-          disabled={saving}
-          style={[s.saveLineupButton, saving && s.buttonDisabled]}
+          disabled={saving || saved}
+          style={[
+            s.saveLineupButton,
+            saving && s.buttonDisabled,
+            saved && s.saveLineupButtonSaved,
+          ]}
           onPress={async () => {
             setSaving(true);
             try {
               await onSave({ refereeRating, conduct, note });
-              Alert.alert(
-                "Feedback saved",
-                "Thank you for helping football improve.",
-              );
+              setSaved(true);
+              await holdSuccessState();
               close();
             } catch (error) {
-              Alert.alert(
-                "Couldn’t save feedback",
-                error?.message || "Please try again.",
+              showActionError(
+                "The feedback was not saved.",
+                error?.message || "The save request did not finish.",
+                "Keep this screen open and submit the feedback again.",
               );
             } finally {
               setSaving(false);
             }
           }}
         >
-          <Ionicons name="heart-outline" size={18} color={C.white} />
+          {saving ? (
+            <ActivityIndicator color={C.white} />
+          ) : (
+            <Ionicons
+              name={saved ? "checkmark-circle" : "heart-outline"}
+              size={18}
+              color={C.white}
+            />
+          )}
           <AppText style={s.saveLineupText}>
-            {saving ? "SAVING" : "SAVE FEEDBACK"}
+            {saving ? "SAVING FEEDBACK" : saved ? "FEEDBACK SAVED" : "SAVE FEEDBACK"}
           </AppText>
         </Pressable>
       </View>
@@ -5975,12 +6057,14 @@ function CommunityMatches({
   const [refereeMatch, setRefereeMatch] = useState(null);
   const [refereeFee, setRefereeFee] = useState("25");
   const [busyRequestId, setBusyRequestId] = useState(null);
+  const [acceptedRequestId, setAcceptedRequestId] = useState(null);
   const [captainChat, setCaptainChat] = useState(null);
   const [captainMessages, setCaptainMessages] = useState([]);
   const [captainDraft, setCaptainDraft] = useState("");
   const [resultDetail, setResultDetail] = useState(null);
   const [resultApproval, setResultApproval] = useState(null);
   const [confirmingResult, setConfirmingResult] = useState(false);
+  const [resultSaveState, setResultSaveState] = useState("idle");
   const [disputingResult, setDisputingResult] = useState(false);
   const [proposedHomeScore, setProposedHomeScore] = useState("");
   const [proposedAwayScore, setProposedAwayScore] = useState("");
@@ -6269,39 +6353,52 @@ function CommunityMatches({
           ) : null}
           <Pressable
             disabled={confirmingResult}
-            style={[s.saveLineupButton, confirmingResult && s.buttonDisabled]}
+            style={[
+              s.saveLineupButton,
+              confirmingResult &&
+                resultSaveState !== "confirmed" &&
+                s.buttonDisabled,
+              resultSaveState === "confirmed" && s.saveLineupButtonSaved,
+            ]}
             onPress={async () => {
               setConfirmingResult(true);
+              setResultSaveState("confirming");
               try {
                 await onConfirmResult?.(resultApproval);
+                setResultSaveState("confirmed");
+                await holdSuccessState();
                 setResultApproval(null);
                 setView("Results");
-                Alert.alert(
-                  "Result confirmed",
-                  `${approvalHome.name} ${homeScore} : ${awayScore} ${approvalAway.name}. Statistics are now updated.`,
-                );
               } catch (error) {
-                Alert.alert(
-                  "Couldn’t confirm result",
-                  error?.message || "Please try again.",
+                setResultSaveState("idle");
+                showActionError(
+                  "The result was not confirmed.",
+                  error?.message || "The confirmation request did not finish.",
+                  "Check the displayed score, then confirm it again.",
                 );
               } finally {
                 setConfirmingResult(false);
               }
             }}
           >
-            {confirmingResult ? (
+            {resultSaveState === "confirming" ? (
               <ActivityIndicator color={C.white} />
             ) : (
               <Ionicons
-                name="checkmark-done-outline"
+                name={
+                  resultSaveState === "confirmed"
+                    ? "checkmark-circle"
+                    : "checkmark-done-outline"
+                }
                 size={18}
                 color={C.white}
               />
             )}
             <AppText style={s.saveLineupText}>
-              {confirmingResult
+              {resultSaveState === "confirming"
                 ? "CONFIRMING SCORE"
+                : resultSaveState === "confirmed"
+                  ? "SCORE CONFIRMED"
                 : `CONFIRM ${homeScore} : ${awayScore}`}
             </AppText>
           </Pressable>
@@ -6356,11 +6453,15 @@ function CommunityMatches({
                 disabled={confirmingResult || !disputeReason.trim()}
                 style={[
                   s.saveLineupButton,
-                  (confirmingResult || !disputeReason.trim()) &&
+                  (resultSaveState === "correcting" ||
+                    (!resultSaveState.includes("corrected") &&
+                      !disputeReason.trim())) &&
                     s.buttonDisabled,
+                  resultSaveState === "corrected" && s.saveLineupButtonSaved,
                 ]}
                 onPress={async () => {
                   setConfirmingResult(true);
+                  setResultSaveState("correcting");
                   try {
                     await onDisputeResult?.(
                       resultApproval,
@@ -6370,25 +6471,34 @@ function CommunityMatches({
                       },
                       disputeReason,
                     );
+                    setResultSaveState("corrected");
+                    await holdSuccessState();
                     setResultApproval(null);
                     setDisputingResult(false);
                     setDisputeReason("");
-                    Alert.alert(
-                      "Correction sent",
-                      "Rankings will not change until a corrected score is submitted and confirmed.",
-                    );
                   } catch (error) {
-                    Alert.alert(
-                      "Couldn’t send correction",
-                      error?.message || "Please try again.",
+                    setResultSaveState("idle");
+                    showActionError(
+                      "The score correction was not sent.",
+                      error?.message || "The correction request did not finish.",
+                      "Check the corrected score and reason, then send it again.",
                     );
                   } finally {
                     setConfirmingResult(false);
                   }
                 }}
               >
+                {resultSaveState === "correcting" ? (
+                  <ActivityIndicator color={C.white} />
+                ) : resultSaveState === "corrected" ? (
+                  <Ionicons name="checkmark-circle" size={18} color={C.white} />
+                ) : null}
                 <AppText style={s.saveLineupText}>
-                  SEND SCORE CORRECTION
+                  {resultSaveState === "correcting"
+                    ? "SENDING CORRECTION"
+                    : resultSaveState === "corrected"
+                      ? "CORRECTION SENT"
+                      : "SEND SCORE CORRECTION"}
                 </AppText>
               </Pressable>
             </View>
@@ -6579,10 +6689,11 @@ function CommunityMatches({
               try {
                 await sendConversationMessage(captainChat.id, currentUid, text);
               } catch {
-                Alert.alert(
-                  "Couldn’t send message",
-                  "Please check your connection and try again.",
-                );
+              showActionError(
+                "The message was not sent.",
+                "The chat connection did not complete the send.",
+                "Check your connection and press Send again.",
+              );
               }
             }}
           >
@@ -6640,10 +6751,10 @@ function CommunityMatches({
                       await onRequestReferee(refereeMatch, profile, refereeFee);
                       setRefereeMatch(null);
                     } catch (error) {
-                      Alert.alert(
-                        "Couldn’t request referee",
-                        error?.message ||
-                          "Please check your connection and try again.",
+                      showActionError(
+                        "The referee request was not sent.",
+                        error?.message || "The request did not finish.",
+                        "Check the selected referee and connection, then send again.",
                       );
                     }
                   }}
@@ -6675,6 +6786,8 @@ function CommunityMatches({
         finish={async (result) => {
           if (match.canonicalId && onCompleteMatch)
             await onCompleteMatch(match.canonicalId, result);
+        }}
+        onSaved={() => {
           setMatch(null);
           setView("Results");
         }}
@@ -6803,10 +6916,10 @@ function CommunityMatches({
                                   matchId: item.id,
                                 });
                               } catch (error) {
-                                Alert.alert(
-                                  "Chat is not ready",
-                                  error?.message ||
-                                    "Please try opening the game chat again.",
+                                showActionError(
+                                  "The game chat did not open.",
+                                  error?.message || "The logistics room is not ready yet.",
+                                  "Return to the match and open Game chat again.",
                                 );
                               }
                             }
@@ -6914,25 +7027,39 @@ function CommunityMatches({
                       style={[
                         s.acceptButton,
                         item.recipientTeamId !== team?.id && s.buttonDisabled,
+                        acceptedRequestId === item.id && s.saveLineupButtonSaved,
                       ]}
                       onPress={async () => {
                         setBusyRequestId(item.id);
                         try {
                           await onRespond(item, "accepted");
+                          setAcceptedRequestId(item.id);
+                          await holdSuccessState();
                           setView("Upcoming");
                         } catch (error) {
-                          Alert.alert(
-                            "Couldn’t accept match",
-                            "The match could not be confirmed. Please try again.",
+                          showActionError(
+                            "The match was not accepted.",
+                            "The fixture confirmation did not finish on both sides.",
+                            "Check your connection, reopen the request and accept again.",
                           );
                         } finally {
                           setBusyRequestId(null);
+                          setAcceptedRequestId(null);
                         }
                       }}
                     >
+                      {busyRequestId === item.id ? (
+                        acceptedRequestId === item.id ? (
+                          <Ionicons name="checkmark-circle" size={16} color={C.white} />
+                        ) : (
+                          <ActivityIndicator size="small" color={C.white} />
+                        )
+                      ) : null}
                       <AppText style={s.primaryText}>
                         {busyRequestId === item.id
-                          ? "Accepting"
+                          ? acceptedRequestId === item.id
+                            ? "Match accepted"
+                            : "Accepting"
                           : item.recipientTeamId === team?.id
                             ? "Accept"
                             : "Waiting"}
@@ -7402,9 +7529,10 @@ function CommunitySquad({ team, onSave, rosterProfiles = [] }) {
               });
               setSaved(true);
             } catch (error) {
-              Alert.alert(
-                "Couldn’t save lineup",
-                "Please check your connection and try again.",
+              showActionError(
+                "The lineup was not saved.",
+                "The lineup save did not finish.",
+                "Check your connection and press Save lineup again.",
               );
             } finally {
               setSaving(false);
@@ -7852,10 +7980,10 @@ function ChallengeWizard({
                 setSent(true);
                 close();
               } catch (error) {
-                Alert.alert(
-                  "Couldn’t send request",
-                  error?.message ||
-                    "The request wasn’t sent. Please try again.",
+                showActionError(
+                  "The match request was not sent.",
+                  error?.message || "The request did not finish.",
+                  "Review the date, venue and terms, then send it again.",
                 );
               } finally {
                 setSending(false);
@@ -9910,9 +10038,10 @@ function LegacyCreateLeagueScreen({ close, onCreateLeague }) {
               setInvited([]);
               setCreated(true);
             } catch {
-              Alert.alert(
-                "Couldn’t create league",
-                "Please check your connection and try again.",
+              showActionError(
+                "The league was not created.",
+                "The competition details could not be saved.",
+                "Check the required fields and connection, then create it again.",
               );
             } finally {
               setSaving(false);
@@ -10440,9 +10569,10 @@ function CreateLeagueScreen({
               Alert.alert("Competition created", `${name.trim()} is ready.`);
               close();
             } catch (error) {
-              Alert.alert(
-                "Couldn’t create competition",
-                error?.message || "Please check your connection and try again.",
+              showActionError(
+                "The competition was not created.",
+                error?.message || "The competition details could not be saved.",
+                "Check the required details and connection, then create it again.",
               );
             } finally {
               setSaving(false);
@@ -10937,6 +11067,7 @@ function TeamSetupTool({ tool, close }) {
 
 function DropdownField({
   label,
+  required = false,
   value,
   options,
   placeholder,
@@ -10958,7 +11089,7 @@ function DropdownField({
   };
   return (
     <>
-      <AppText style={s.formLabel}>{label}</AppText>
+      <FormLabel required={required}>{label}</FormLabel>
       <Pressable
         onPress={() => !disabled && setOpen(true)}
         disabled={disabled}
@@ -11074,7 +11205,20 @@ function DropdownField({
   );
 }
 
-function TeamRegionFields({ value, onChange }) {
+function FormLabel({ children, required = false }) {
+  return (
+    <AppText style={s.formLabel}>
+      {children}
+      {required ? (
+        <AppText style={s.requiredMark} accessibilityLabel="required">
+          {" *"}
+        </AppText>
+      ) : null}
+    </AppText>
+  );
+}
+
+function TeamRegionFields({ value, onChange, required = false }) {
   const [countries, setCountries] = useState(fallbackCountries());
   const [provinces, setProvinces] = useState(() =>
     fallbackProvinces(value.country),
@@ -11116,7 +11260,11 @@ function TeamRegionFields({ value, onChange }) {
       .catch(() => {
         if (active && !localItems.length)
           setLocationListMessage(
-            "Province list could not load. Check the connection and choose the country again.",
+            actionErrorText(
+              "The province list did not load.",
+              "The location service could not return places for this country.",
+              "Check your connection and choose the country again.",
+            ),
           );
       })
       .finally(() => active && setLoadingLevel(""));
@@ -11145,7 +11293,11 @@ function TeamRegionFields({ value, onChange }) {
       .catch(() => {
         if (active && !localItems.length)
           setLocationListMessage(
-            "City and town list could not load. Check the connection and choose the province again.",
+            actionErrorText(
+              "The city and town list did not load.",
+              "The location service could not return places for this province.",
+              "Check your connection and choose the province again.",
+            ),
           );
       })
       .finally(() => active && setLoadingLevel(""));
@@ -11158,6 +11310,7 @@ function TeamRegionFields({ value, onChange }) {
     <>
       <DropdownField
         label="Country"
+        required={required}
         options={countries}
         value={value.country}
         placeholder="Choose country"
@@ -11170,6 +11323,7 @@ function TeamRegionFields({ value, onChange }) {
       />
       <DropdownField
         label="Province"
+        required={required}
         options={provinces.map((item) => item.name)}
         value={value.province}
         placeholder={
@@ -11184,6 +11338,7 @@ function TeamRegionFields({ value, onChange }) {
       />
       <DropdownField
         label="City or town"
+        required={required}
         options={cities}
         value={value.city}
         placeholder={
@@ -11197,7 +11352,7 @@ function TeamRegionFields({ value, onChange }) {
       {locationListMessage ? (
         <AppText style={s.locationListMessage}>{locationListMessage}</AppText>
       ) : null}
-      <AppText style={s.formLabel}>Suburb or local area</AppText>
+      <FormLabel required={required}>Suburb or local area</FormLabel>
       <TextInput
         value={value.suburb}
         onChangeText={(suburb) => onChange({ ...value, suburb })}
@@ -11531,7 +11686,11 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== "granted") {
         setLocationMessage(
-          "Location access was not allowed. You can still enter the area manually.",
+          actionErrorText(
+            "Your current location was not added.",
+            "Location permission is turned off for Grassroots.",
+            "Allow location access in device settings or enter the area manually.",
+          ),
         );
         return;
       }
@@ -11565,7 +11724,11 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
       }
     } catch (error) {
       setLocationMessage(
-        "Current location is unavailable. Check that location services are on, or enter the area manually.",
+        actionErrorText(
+          "Your current location was not added.",
+          "The device could not provide a location right now.",
+          "Turn on location services and try again, or enter the area manually.",
+        ),
       );
     } finally {
       setLocating(false);
@@ -11599,7 +11762,13 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
       !location.city ||
       !location.suburb.trim()
     ) {
-      setSaveError("Add the team name, country, province, city and suburb.");
+      setSaveError(
+        actionErrorText(
+          "The team was not saved.",
+          "One or more required team or location fields are empty.",
+          "Complete every field marked * and press Create team again.",
+        ),
+      );
       return;
     }
     saveLock.current = true;
@@ -11630,10 +11799,22 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
       saveLock.current = false;
       setSaveError(
         error?.code === "permission-denied"
-          ? "Your account could not complete team setup. Sign out, sign in again and retry."
+          ? actionErrorText(
+              "The team was not saved.",
+              "This signed-in session no longer has permission to create the team.",
+              "Sign out, sign in again, then create the team once more.",
+            )
           : error?.code === "unavailable"
-            ? "The connection dropped before the team was saved. Check your connection and retry."
-            : "The team could not be saved. Please try again.",
+            ? actionErrorText(
+                "The team was not saved.",
+                "The connection dropped before saving finished.",
+                "Reconnect to the internet and press Create team again.",
+              )
+            : actionErrorText(
+                "The team was not saved.",
+                "The save request did not finish successfully.",
+                "Keep the form open and press Create team again.",
+              ),
       );
       console.warn("Team setup failed", error?.code || error?.message);
     } finally {
@@ -11699,7 +11880,8 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
       </View>
       <View style={s.formSection}>
         <AppText style={s.formSectionTitle}>Team details</AppText>
-        <AppText style={s.formLabel}>Team name</AppText>
+        <AppText style={s.requiredHint}>* Required to create the team</AppText>
+        <FormLabel required>Team name</FormLabel>
         <TextInput
           value={teamName}
           onChangeText={setTeamName}
@@ -11731,15 +11913,17 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
         {locationMessage ? (
           <AppText style={s.liveLocationMessage}>{locationMessage}</AppText>
         ) : null}
-        <TeamRegionFields value={location} onChange={setLocation} />
+        <TeamRegionFields value={location} onChange={setLocation} required />
         <ProfileChoiceGroup
           label="Age group"
+          required
           options={["U13", "U15", "U17", "U20", "Senior", "Veterans"]}
           value={ageGroup}
           onChange={setAgeGroup}
         />
         <ProfileChoiceGroup
           label="Team category"
+          required
           options={FOOTBALL_CATEGORIES}
           value={teamCategory}
           onChange={setTeamCategory}
@@ -12299,13 +12483,14 @@ function TeamSettingsScreen({ team, close, onUpdateTeam }) {
         ground: { name: groundName.trim(), coordinate },
       });
       setSyncState("Saved");
+      await holdSuccessState();
       setEditing(false);
-      Alert.alert("Team saved", "Your team profile has been updated.");
     } catch (error) {
       setSyncState("Couldn’t save");
-      Alert.alert(
-        "Couldn’t save team",
-        "Please check your connection and try again.",
+      showActionError(
+        "The team changes were not saved.",
+        "The update did not finish.",
+        "Check your connection and press Save changes again.",
       );
     }
   };
@@ -12320,7 +12505,13 @@ function TeamSettingsScreen({ team, close, onUpdateTeam }) {
             <AppText style={s.headerTitle}>TEAM PROFILE</AppText>
             <AppText style={s.headerSub}>YOUR PUBLIC TEAM VIEW</AppText>
           </View>
-          <Pressable onPress={() => setEditing(true)} style={s.roleMiniButton}>
+          <Pressable
+            onPress={() => {
+              setSyncState("Ready");
+              setEditing(true);
+            }}
+            style={s.roleMiniButton}
+          >
             <AppText style={s.roleMiniButtonText}>EDIT</AppText>
           </Pressable>
         </View>
@@ -12455,9 +12646,31 @@ function TeamSettingsScreen({ team, close, onUpdateTeam }) {
           style={s.formInput}
         />
         <GroundMap coordinate={coordinate} onChange={setCoordinate} />
-        <Pressable onPress={save} style={s.saveLineupButton}>
-          <Ionicons name="cloud-done-outline" color="white" size={18} />
-          <AppText style={s.saveLineupText}>SAVE TEAM SETTINGS</AppText>
+        <Pressable
+          disabled={syncState === "Saving"}
+          onPress={save}
+          style={[
+            s.saveLineupButton,
+            syncState === "Saving" && s.buttonDisabled,
+            syncState === "Saved" && s.saveLineupButtonSaved,
+          ]}
+        >
+          {syncState === "Saving" ? (
+            <ActivityIndicator color={C.white} />
+          ) : (
+            <Ionicons
+              name={syncState === "Saved" ? "checkmark-circle" : "cloud-done-outline"}
+              color="white"
+              size={18}
+            />
+          )}
+          <AppText style={s.saveLineupText}>
+            {syncState === "Saving"
+              ? "SAVING TEAM DETAILS"
+              : syncState === "Saved"
+                ? "TEAM DETAILS SAVED"
+                : "SAVE TEAM SETTINGS"}
+          </AppText>
         </Pressable>
       </View>
     </ScrollView>
@@ -13181,7 +13394,11 @@ function MoreDetail({
       () => {
         setMessages([]);
         setChatLoadError(
-          "Messages could not be loaded. Check your connection.",
+          actionErrorText(
+            "Messages did not load.",
+            "The conversation could not be reached.",
+            "Check your connection and press Try again.",
+          ),
         );
       },
     );
@@ -13309,7 +13526,11 @@ function MoreDetail({
                 closeConversation(selectedConversation.id, currentUid)
                   .then(() => setSelectedConversation(null))
                   .catch(() =>
-                    Alert.alert("Couldn’t close chat", "Please try again."),
+                    showActionError(
+                      "The chat was not closed.",
+                      "The close request did not finish.",
+                      "Keep the chat open and try Close chat again.",
+                    ),
                   )
               }
             >
@@ -13397,10 +13618,10 @@ function MoreDetail({
                 );
                 setMessageText("");
               } catch (error) {
-                Alert.alert(
-                  "Couldn’t send message",
-                  error?.message ||
-                    "Please check your connection and try again.",
+                showActionError(
+                  "The message was not sent.",
+                  error?.message || "The chat connection did not complete the send.",
+                  "Check your connection and press Send again.",
                 );
               } finally {
                 setChatSending(false);
@@ -13848,9 +14069,10 @@ function MoreDetail({
                               `${profile.name} is now in your team.`,
                             );
                           } catch {
-                            Alert.alert(
-                              "Couldn’t accept request",
-                              "Please check your connection and try again.",
+                            showActionError(
+                              "The player request was not accepted.",
+                              "The squad update did not finish.",
+                              "Check your connection, reopen the request and accept again.",
                             );
                           }
                         }}
@@ -13934,9 +14156,10 @@ function MoreDetail({
                                 style: "destructive",
                                 onPress: () =>
                                   onRemovePlayer(profile).catch(() =>
-                                    Alert.alert(
-                                      "Couldn’t remove player",
-                                      "Please check your connection and try again.",
+                                    showActionError(
+                                      "The player was not removed.",
+                                      "The squad update did not finish.",
+                                      "Check your connection and remove the player again.",
                                     ),
                                   ),
                               },
@@ -13955,9 +14178,10 @@ function MoreDetail({
                             `${profile.name} is now in your team.`,
                           );
                         } catch {
-                          Alert.alert(
-                            "Couldn’t add player",
-                            "Please check your connection and try again.",
+                          showActionError(
+                            "The player was not added.",
+                            "The squad update did not finish.",
+                            "Check the player’s team status and connection, then add again.",
                           );
                         }
                       }}
@@ -14351,10 +14575,10 @@ function MoreDetail({
                       }
                       onPress={() =>
                         onJoinLeague(item).catch((error) =>
-                          Alert.alert(
-                            "Couldn’t join competition",
-                            error?.message ||
-                              "Please check your connection and try again.",
+                          showActionError(
+                            "The team did not join the competition.",
+                            error?.message || "The join request did not finish.",
+                            "Check eligibility and available places, then join again.",
                           ),
                         )
                       }
@@ -14785,9 +15009,10 @@ function RoleToolScreen({
                   setContact("");
                   setSelectedProfile(null);
                 } catch {
-                  Alert.alert(
-                    "Couldn’t add this person",
-                    "Please check your connection and try again.",
+                  showActionError(
+                    "The person was not added.",
+                    "The invitation or membership update did not finish.",
+                    "Check the selected person and connection, then add again.",
                   );
                 } finally {
                   setInviteBusy(false);
@@ -15641,7 +15866,11 @@ function GrassrootsHub({
                   Alert.alert("Ground shared", "Nearby teams can now find it.");
                 },
               ).catch(() =>
-                Alert.alert("Couldn’t share ground", "Please try again."),
+                showActionError(
+                  "The ground was not shared.",
+                  "The ground details could not be saved.",
+                  "Check the name, area and connection, then share it again.",
+                ),
               )
             }
           >
@@ -15695,9 +15924,10 @@ function GrassrootsHub({
                         ),
                       )
                       .catch((error) =>
-                        Alert.alert(
-                          "Couldn’t confirm ground",
-                          error?.message || "Please try again.",
+                        showActionError(
+                          "The ground was not confirmed.",
+                          error?.message || "The confirmation did not finish.",
+                          "Check that you are nearby, then confirm the ground again.",
                         ),
                       )
                   }
@@ -15886,7 +16116,11 @@ function GrassrootsHub({
                     "These defaults can change for any arranged match.",
                   ),
               ).catch(() =>
-                Alert.alert("Couldn’t save rules", "Please try again."),
+                showActionError(
+                  "The match rules were not saved.",
+                  "The team defaults could not be updated.",
+                  "Review the selected rules and press Save team defaults again.",
+                ),
               )
             }
           >
@@ -15941,7 +16175,11 @@ function GrassrootsHub({
                   ),
                 )
                 .catch(() =>
-                  Alert.alert("Couldn’t save contact", "Please try again."),
+                  showActionError(
+                    "The safety contact was not saved.",
+                    "The trusted contact update did not finish.",
+                    "Check the name and contact details, then save again.",
+                  ),
                 )
             }
           >
@@ -16008,7 +16246,11 @@ function GrassrootsHub({
                   );
                 },
               ).catch(() =>
-                Alert.alert("Couldn’t save report", "Please try again."),
+                showActionError(
+                  "The private report was not saved.",
+                  "The secure save did not finish.",
+                  "Keep the screen open, check your connection and save again.",
+                ),
               )
             }
           >
@@ -16146,7 +16388,11 @@ function GrassrootsHub({
                   );
                 },
               ).catch(() =>
-                Alert.alert("Couldn’t post opportunity", "Please try again."),
+                showActionError(
+                  "The opportunity was not posted.",
+                  "The post details could not be saved.",
+                  "Check the title, area and connection, then post again.",
+                ),
               )
             }
           >
@@ -16338,9 +16584,10 @@ function GrassrootsHub({
                               );
                             })
                             .catch((error) =>
-                              Alert.alert(
-                                "Couldn’t send question",
-                                error?.message || "Please try again.",
+                              showActionError(
+                                "The question was not sent.",
+                                error?.message || "The conversation could not be opened.",
+                                "Check your connection and send the question again.",
                               ),
                             )
                         }
@@ -17099,19 +17346,42 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const setAuthError = (why, action) =>
+    setError(
+      actionErrorText(
+        mode === "signup" ? "Account setup stopped." : "Sign in stopped.",
+        why,
+        action,
+      ),
+    );
 
   const submit = async () => {
     setError("");
     if (contactMethod === "email" && (!email.trim() || !email.includes("@")))
-      return setError("Enter a valid email address.");
+      return setAuthError(
+        "The email address is incomplete or has the wrong format.",
+        "Check the address and enter it like name@example.com.",
+      );
     if (contactMethod === "phone" && !normalizeZimbabwePhone(phoneNumber))
-      return setError("Enter a valid Zimbabwe mobile number.");
+      return setAuthError(
+        "The mobile number is not a valid Zimbabwe number.",
+        "Enter the number beginning with 07 or +263.",
+      );
     if (mode === "signup" && name.trim().length < 2)
-      return setError("Tell us the name your football community knows you by.");
+      return setAuthError(
+        "A profile name has not been entered.",
+        "Add the name your football community knows you by.",
+      );
     if (mode === "signup" && !role)
-      return setError("Choose your main football role.");
+      return setAuthError(
+        "No main football role was selected.",
+        "Choose Player, Coach, Referee, Scout or Sponsor.",
+      );
     if (password.length < 8)
-      return setError("Use at least 8 characters for your password.");
+      return setAuthError(
+        "The password has fewer than 8 characters.",
+        "Create a password containing at least 8 characters.",
+      );
     setBusy(true);
     try {
       const session =
@@ -17129,7 +17399,10 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
             });
       onAuthenticated(session);
     } catch (submitError) {
-      setError(submitError.message || "Something went wrong. Try again.");
+      setAuthError(
+        submitError.message || "The account service did not complete the request.",
+        "Check your details and connection, then try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -17503,6 +17776,7 @@ function RoleAction({ icon, title, copy, action, label, complete, style }) {
 
 function ProfileChoiceGroup({
   label,
+  required = false,
   options,
   value,
   onChange,
@@ -17512,7 +17786,7 @@ function ProfileChoiceGroup({
     multiple ? value.includes(option) : value === option;
   return (
     <>
-      <AppText style={s.formLabel}>{label}</AppText>
+      <FormLabel required={required}>{label}</FormLabel>
       <View style={s.optionWrap}>
         {options.map((option) => (
           <Pressable
@@ -17567,16 +17841,25 @@ function ProfileTabs({
   );
 }
 
-function RefereeProfile({ data, update, onSave }) {
+function RefereeProfile({ data, update, onSave, saving = false, saved = false }) {
   const [view, setView] = useState("Identity");
   const [certificate, setCertificate] = useState("");
   const tabs = ["Identity", "Credentials", "Official card"];
+  const requiredComplete = Boolean(
+    data.name?.trim() &&
+      data.area?.trim() &&
+      data.nationality?.trim() &&
+      data.refereeRole &&
+      (data.refereePath !== "Association registered" ||
+        (data.association?.trim() && data.fifaId?.trim() && data.category?.trim())),
+  );
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted)
-      return Alert.alert(
-        "Photos permission needed",
-        "Allow Grassroots to choose an ID portrait.",
+      return showActionError(
+        "The photo picker did not open.",
+        "Grassroots does not have permission to view photos on this device.",
+        "Allow photo access in device settings, then choose the portrait again.",
       );
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -17626,14 +17909,15 @@ function RefereeProfile({ data, update, onSave }) {
         {view === "Identity" ? (
           <>
             <AppText style={s.settingsGroupTitle}>OFFICIAL IDENTITY</AppText>
+            <AppText style={s.requiredHint}>* Required to save your profile</AppText>
             {[
-              ["Full name", "name"],
-              ["Town, suburb or district", "area"],
-              ["Nationality", "nationality"],
-              ["Languages", "languages"],
-            ].map(([label, key]) => (
+              ["Full name", "name", true],
+              ["Town, suburb or district", "area", true],
+              ["Nationality", "nationality", true],
+              ["Languages", "languages", false],
+            ].map(([label, key, required]) => (
               <React.Fragment key={key}>
-                <AppText style={s.formLabel}>{label}</AppText>
+                <FormLabel required={required}>{label}</FormLabel>
                 <TextInput
                   value={String(data[key] || "")}
                   onChangeText={(value) => update({ [key]: value })}
@@ -17643,6 +17927,7 @@ function RefereeProfile({ data, update, onSave }) {
             ))}
             <ProfileChoiceGroup
               label="Referee pathway"
+              required
               options={["Community volunteer", "Association registered"]}
               value={data.refereePath || "Community volunteer"}
               onChange={(refereePath) => update({ refereePath })}
@@ -17655,7 +17940,7 @@ function RefereeProfile({ data, update, onSave }) {
                   ["Category", "category"],
                 ].map(([label, key]) => (
                   <React.Fragment key={key}>
-                    <AppText style={s.formLabel}>{label}</AppText>
+                    <FormLabel required>{label}</FormLabel>
                     <TextInput
                       value={String(data[key] || "")}
                       onChangeText={(value) => update({ [key]: value })}
@@ -17675,6 +17960,7 @@ function RefereeProfile({ data, update, onSave }) {
             )}
             <ProfileChoiceGroup
               label="Match role"
+              required
               options={["Referee", "Assistant referee", "Fourth official"]}
               value={data.refereeRole}
               onChange={(refereeRole) => update({ refereeRole })}
@@ -17838,11 +18124,22 @@ function RefereeProfile({ data, update, onSave }) {
           </>
         )}
         <Pressable
-          disabled={!data.name?.trim()}
+          disabled={!requiredComplete || saving || saved}
           onPress={onSave}
-          style={[s.saveLineupButton, !data.name?.trim() && s.buttonDisabled]}
+          style={[
+            s.saveLineupButton,
+            (!requiredComplete || saving) && s.buttonDisabled,
+            saved && s.saveLineupButtonSaved,
+          ]}
         >
-          <AppText style={s.saveLineupText}>SAVE PROFILE</AppText>
+          {saving ? (
+            <ActivityIndicator color={C.white} />
+          ) : saved ? (
+            <Ionicons name="checkmark-circle" size={18} color={C.white} />
+          ) : null}
+          <AppText style={s.saveLineupText}>
+            {saving ? "SAVING PROFILE" : saved ? "PROFILE SAVED" : "SAVE PROFILE"}
+          </AppText>
         </Pressable>
       </View>
     </ScrollView>
@@ -18475,12 +18772,14 @@ function SavedRolePreview({ role, data, onEdit }) {
   );
 }
 
-function CoachProfile({ data, update, onSave }) {
+function CoachProfile({ data, update, onSave, saving = false, saved = false }) {
+  const requiredComplete = Boolean(data.name?.trim() && data.area?.trim());
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
       <RoleHeader role="Coach" title="Coach profile" />
       <View style={s.communityListSection}>
-        <AppText style={s.formLabel}>Full name</AppText>
+        <AppText style={s.requiredHint}>* Required to save your profile</AppText>
+        <FormLabel required>Full name</FormLabel>
         <TextInput
           value={data.name}
           onChangeText={(name) => update({ name })}
@@ -18496,7 +18795,7 @@ function CoachProfile({ data, update, onSave }) {
           placeholderTextColor="#756D7D"
           style={s.formInput}
         />
-        <AppText style={s.formLabel}>Area</AppText>
+        <FormLabel required>Area</FormLabel>
         <TextInput
           value={data.area}
           onChangeText={(area) => update({ area })}
@@ -18521,11 +18820,22 @@ function CoachProfile({ data, update, onSave }) {
           </AppText>
         </View>
         <Pressable
-          disabled={!data.name?.trim()}
+          disabled={!requiredComplete || saving || saved}
           onPress={onSave}
-          style={[s.saveLineupButton, !data.name?.trim() && s.buttonDisabled]}
+          style={[
+            s.saveLineupButton,
+            (!requiredComplete || saving) && s.buttonDisabled,
+            saved && s.saveLineupButtonSaved,
+          ]}
         >
-          <AppText style={s.saveLineupText}>SAVE PROFILE</AppText>
+          {saving ? (
+            <ActivityIndicator color={C.white} />
+          ) : saved ? (
+            <Ionicons name="checkmark-circle" size={18} color={C.white} />
+          ) : null}
+          <AppText style={s.saveLineupText}>
+            {saving ? "SAVING PROFILE" : saved ? "PROFILE SAVED" : "SAVE PROFILE"}
+          </AppText>
         </Pressable>
       </View>
     </ScrollView>
@@ -18536,19 +18846,54 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
   const [view, setView] = useState("Details");
   const [editing, setEditing] = useState(!data.profileSaved);
   const [saving, setSaving] = useState(false);
+  const [savedNow, setSavedNow] = useState(false);
+  const requiredComplete =
+    role === "Player"
+      ? Boolean(
+          data.name?.trim() &&
+            data.position &&
+            data.dateOfBirth &&
+            data.area?.trim(),
+        )
+      : role === "Sponsor"
+        ? Boolean(
+            data.name?.trim() &&
+              data.organization?.trim() &&
+              data.sector &&
+              data.area?.trim() &&
+              data.sponsorTypes?.length,
+          )
+        : role === "Scout"
+          ? Boolean(
+              data.name?.trim() &&
+                data.organization?.trim() &&
+                data.area?.trim() &&
+                data.specialties?.length,
+            )
+          : Boolean(data.name?.trim());
   const saveProfile = async () => {
+    if (!requiredComplete) {
+      Alert.alert(
+        "Complete required fields",
+        "Fill in every field marked * before saving.",
+      );
+      return;
+    }
     setSaving(true);
     try {
       await onSaveProfile(data);
+      setSavedNow(true);
+      await holdSuccessState();
       setEditing(false);
-      Alert.alert("Profile saved", "Your preview is ready.");
     } catch {
-      Alert.alert(
-        "Couldn’t save profile",
-        "Please check your connection and try again.",
+      showActionError(
+        "The profile was not saved.",
+        "The profile update did not finish.",
+        "Keep your changes, check your connection and press Save profile again.",
       );
     } finally {
       setSaving(false);
+      setSavedNow(false);
     }
   };
   if (data.profileSaved && !editing)
@@ -18560,17 +18905,34 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
       />
     );
   if (role === "Coach")
-    return <CoachProfile data={data} update={update} onSave={saveProfile} />;
+    return (
+      <CoachProfile
+        data={data}
+        update={update}
+        onSave={saveProfile}
+        saving={saving}
+        saved={savedNow}
+      />
+    );
   if (role === "Referee")
-    return <RefereeProfile data={data} update={update} onSave={saveProfile} />;
+    return (
+      <RefereeProfile
+        data={data}
+        update={update}
+        onSave={saveProfile}
+        saving={saving}
+        saved={savedNow}
+      />
+    );
   const playerLike = role === "Player";
   const imageUri = role === "Sponsor" ? data.logoUri : data.profileImage;
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted)
-      return Alert.alert(
-        "Photos permission needed",
-        "Allow Grassroots to choose a profile image.",
+      return showActionError(
+        "The photo picker did not open.",
+        "Grassroots does not have permission to view photos on this device.",
+        "Allow photo access in device settings, then choose the image again.",
       );
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -18658,6 +19020,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
         </View>
       </View>
       <View style={s.communityListSection}>
+        <AppText style={s.requiredHint}>* Required to save your profile</AppText>
         <AppText style={s.settingsGroupTitle}>
           {playerLike
             ? "FOOTBALL IDENTITY"
@@ -18665,9 +19028,9 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
               ? "ORGANISATION"
               : "SCOUT IDENTITY"}
         </AppText>
-        <AppText style={s.formLabel}>
+        <FormLabel required>
           {role === "Sponsor" ? "Contact person" : "Full name"}
-        </AppText>
+        </FormLabel>
         <TextInput
           value={data.name}
           onChangeText={(name) => {
@@ -18678,7 +19041,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
         />
         {role === "Sponsor" || role === "Scout" ? (
           <>
-            <AppText style={s.formLabel}>Organisation</AppText>
+            <FormLabel required>Organisation</FormLabel>
             <TextInput
               value={data.organization}
               onChangeText={(organization) => {
@@ -18697,6 +19060,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
           <>
             <ProfileChoiceGroup
               label="Primary position"
+              required
               options={["Goalkeeper", "Defender", "Midfielder", "Forward"]}
               value={data.position}
               onChange={(position) =>
@@ -18732,7 +19096,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
               ["Registration ID", "registrationId", "Association registration"],
             ].map(([label, key, placeholder]) => (
               <React.Fragment key={key}>
-                <AppText style={s.formLabel}>{label}</AppText>
+                <FormLabel required={key === "dateOfBirth"}>{label}</FormLabel>
                 {key === "dateOfBirth" ? (
                   <DateField
                     value={data.dateOfBirth}
@@ -18768,7 +19132,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
               value={data.contractStatus}
               onChange={(contractStatus) => update({ contractStatus })}
             />
-            <AppText style={s.formLabel}>Home area</AppText>
+            <FormLabel required>Home area</FormLabel>
             <TextInput
               value={data.area}
               onChangeText={(area) => update({ area })}
@@ -18880,6 +19244,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
           <>
             <ProfileChoiceGroup
               label="Sector"
+              required
               options={[
                 "Retail",
                 "Finance",
@@ -18890,7 +19255,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
               value={data.sector}
               onChange={(sector) => update({ sector })}
             />
-            <AppText style={s.formLabel}>Operating area</AppText>
+            <FormLabel required>Operating area</FormLabel>
             <TextInput
               value={data.area}
               onChangeText={(area) => update({ area })}
@@ -18908,6 +19273,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
             <ProfileChoiceGroup
               multiple
               label="Interested in sponsoring"
+              required
               options={["Kits", "Matches", "Leagues", "Youth", "Grounds"]}
               value={data.sponsorTypes}
               onChange={(sponsorTypes) => update({ sponsorTypes })}
@@ -18982,7 +19348,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
               placeholder="Scouting role or licence"
               style={s.formInput}
             />
-            <AppText style={s.formLabel}>Coverage area</AppText>
+            <FormLabel required>Coverage area</FormLabel>
             <TextInput
               value={data.area}
               onChangeText={(area) => update({ area })}
@@ -18992,6 +19358,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
             <ProfileChoiceGroup
               multiple
               label="Scouting focus"
+              required
               options={[
                 "U18",
                 "U23",
@@ -19115,15 +19482,21 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
           </AppText>
         </Pressable>
         <Pressable
-          disabled={!data.name?.trim()}
+          disabled={saving || savedNow || !requiredComplete}
           onPress={saveProfile}
           style={[
             s.saveLineupButton,
-            (saving || !data.name?.trim()) && s.buttonDisabled,
+            (saving || !requiredComplete) && s.buttonDisabled,
+            savedNow && s.saveLineupButtonSaved,
           ]}
         >
+          {saving ? (
+            <ActivityIndicator color={C.white} />
+          ) : savedNow ? (
+            <Ionicons name="checkmark-circle" size={18} color={C.white} />
+          ) : null}
           <AppText style={s.saveLineupText}>
-            {saving ? "SAVING" : "SAVE PROFILE"}
+            {saving ? "SAVING PROFILE" : savedNow ? "PROFILE SAVED" : "SAVE PROFILE"}
           </AppText>
         </Pressable>
       </View>
@@ -19221,10 +19594,10 @@ function RefereeAssignments({ data, update, assignments = [], onRespond }) {
                   try {
                     await onRespond(assignment, "accepted");
                   } catch (error) {
-                    Alert.alert(
-                      "Couldn’t accept appointment",
-                      error?.message ||
-                        "Please check your connection and try again.",
+                    showActionError(
+                      "The referee appointment was not accepted.",
+                      error?.message || "The appointment update did not finish.",
+                      "Check the fixture and connection, then accept again.",
                     );
                   } finally {
                     setBusyId(null);
@@ -19434,7 +19807,11 @@ function AccountRoleBar({ roles, activeRole, onSwitch, onAdd, onRemove }) {
       await onAdd(role);
       setMode("switch");
     } catch {
-      Alert.alert("Couldn’t add role", "Please try again.");
+      showActionError(
+        "The role was not added.",
+        "The account update did not finish.",
+        "Check your connection and add the role again.",
+      );
     } finally {
       setBusyRole(null);
     }
@@ -19445,7 +19822,11 @@ function AccountRoleBar({ roles, activeRole, onSwitch, onAdd, onRemove }) {
       await onRemove(role);
       setMode("switch");
     } catch {
-      Alert.alert("Couldn’t remove role", "Please try again.");
+      showActionError(
+        "The role was not removed.",
+        "The account update did not finish or it is your only role.",
+        "Keep at least one role, then try removing it again.",
+      );
     } finally {
       setBusyRole(null);
     }
@@ -19578,7 +19959,11 @@ function RoleWorkspace({
       () => {
         setPrivateMessages([]);
         setPrivateChatError(
-          "Messages could not be loaded. Check your connection.",
+          actionErrorText(
+            "Messages did not load.",
+            "The private conversation could not be reached.",
+            "Check your connection and reopen the chat.",
+          ),
         );
       },
     );
@@ -19664,7 +20049,11 @@ function RoleWorkspace({
                   closeConversation(selectedPrivateChat.id, currentUid)
                     .then(() => setSelectedPrivateChat(null))
                     .catch(() =>
-                      Alert.alert("Couldn’t close chat", "Please try again."),
+                      showActionError(
+                        "The chat was not closed.",
+                        "The close request did not finish.",
+                        "Keep the chat open and try Close chat again.",
+                      ),
                     )
                 }
               >
@@ -19766,7 +20155,11 @@ function RoleWorkspace({
                       ),
                     )
                     .catch(() =>
-                      Alert.alert("Couldn’t report chat", "Please try again."),
+                      showActionError(
+                        "The chat report was not saved.",
+                        "The private report request did not finish.",
+                        "Keep the chat blocked if needed, then submit the report again.",
+                      ),
                     )
                 }
               >
@@ -19853,10 +20246,10 @@ function RoleWorkspace({
                   );
                   setDraft("");
                 } catch (error) {
-                  Alert.alert(
-                    "Couldn’t send message",
-                    error?.message ||
-                      "Please check your connection and try again.",
+                  showActionError(
+                    "The message was not sent.",
+                    error?.message || "The chat connection did not complete the send.",
+                    "Check your connection and press Send again.",
                   );
                 } finally {
                   setPrivateChatSending(false);
@@ -21577,7 +21970,11 @@ function App() {
           : true;
       if (confirmed)
         signOut().catch(() =>
-          Alert.alert("Couldn’t sign out", "Please try again."),
+          showActionError(
+            "You were not signed out.",
+            "The account session could not be closed.",
+            "Check your connection and press Sign out again.",
+          ),
         );
       return;
     }
@@ -21591,7 +21988,11 @@ function App() {
           style: "destructive",
           onPress: () =>
             signOut().catch(() =>
-              Alert.alert("Couldn’t sign out", "Please try again."),
+              showActionError(
+                "You were not signed out.",
+                "The account session could not be closed.",
+                "Check your connection and press Sign out again.",
+              ),
             ),
         },
       ],
@@ -25099,6 +25500,29 @@ const s = StyleSheet.create({
     gap: 8,
   },
   saveLineupButtonSaved: { backgroundColor: C.green },
+  saveSuccessNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#B8DEC8",
+    backgroundColor: "#F0FAF4",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  saveSuccessTitle: {
+    color: "#17633B",
+    fontSize: 12,
+    fontFamily: F.bold,
+  },
+  saveSuccessDetail: {
+    color: "#3E7257",
+    fontSize: 11,
+    fontFamily: F.medium,
+    marginTop: 2,
+  },
   saveLineupText: {
     color: "white",
     fontSize: 12,
@@ -25125,6 +25549,16 @@ const s = StyleSheet.create({
     fontFamily: F.bold,
     marginBottom: 7,
     marginTop: 9,
+  },
+  requiredMark: {
+    color: C.red,
+    fontFamily: F.black,
+  },
+  requiredHint: {
+    color: C.muted,
+    fontSize: 11,
+    fontFamily: F.medium,
+    marginBottom: 4,
   },
   formInput: {
     minHeight: 48,
