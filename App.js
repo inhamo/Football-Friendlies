@@ -41,6 +41,14 @@ import Svg, {
 import GroundMap from "./components/GroundMap";
 import DateField from "./components/DateField";
 import {
+  fallbackCities,
+  fallbackCountries,
+  fallbackProvinces,
+  loadCities as loadLocationCities,
+  loadCountries as loadLocationCountries,
+  loadProvinces as loadLocationProvinces,
+} from "./services/locationData";
+import {
   addAccountRole,
   createAccount,
   createGuestSession,
@@ -658,33 +666,6 @@ const generatedBadgeColors = [
   ...Array.from({ length: 72 }, (_, index) => `hsl(${index * 5}, 72%, 38%)`),
 ];
 
-const polarPoint = (center, radius, angle) => {
-  const radians = ((angle - 90) * Math.PI) / 180;
-  return {
-    x: center + radius * Math.cos(radians),
-    y: center + radius * Math.sin(radians),
-  };
-};
-
-const colourWheelSegment = (
-  center,
-  innerRadius,
-  outerRadius,
-  startAngle,
-  endAngle,
-) => {
-  const outerStart = polarPoint(center, outerRadius, startAngle);
-  const outerEnd = polarPoint(center, outerRadius, endAngle);
-  const innerEnd = polarPoint(center, innerRadius, endAngle);
-  const innerStart = polarPoint(center, innerRadius, startAngle);
-  return [
-    `M ${outerStart.x} ${outerStart.y}`,
-    `A ${outerRadius} ${outerRadius} 0 0 1 ${outerEnd.x} ${outerEnd.y}`,
-    `L ${innerEnd.x} ${innerEnd.y}`,
-    `A ${innerRadius} ${innerRadius} 0 0 0 ${innerStart.x} ${innerStart.y}`,
-    "Z",
-  ].join(" ");
-};
 const secondaryPositionsByPrimary = {
   Goalkeeper: ["Sweeper keeper"],
   Defender: ["Centre back", "Left back", "Right back", "Wing back"],
@@ -947,6 +928,12 @@ const teamLocationLabel = (location = {}) =>
     .map((value) => value?.trim())
     .filter(Boolean)
     .join(", ");
+
+const FOOTBALL_CATEGORIES = ["Men's", "Women's", "Mixed/Open"];
+const footballCategory = (record = {}) =>
+  record.teamCategory || record.competitionCategory || "Mixed/Open";
+const sameFootballCategory = (first, second) =>
+  footballCategory(first) === footballCategory(second);
 
 const savedTeamLocation = (team = {}) => ({
   country: team.location?.country || "Zimbabwe",
@@ -7985,7 +7972,6 @@ function FriendlyFinder({
   const [day, setDay] = useState("Sunday");
   const [time, setTime] = useState("Morning");
   const [venue, setVenue] = useState("Either");
-  const [maxDistance, setMaxDistance] = useState("25 km");
   const [status, setStatus] = useState("setup");
   const [results, setResults] = useState([]);
   const homeBlocked = consecutiveHomeMatches(matches, ownTeam?.id) >= 3;
@@ -8011,11 +7997,140 @@ function FriendlyFinder({
       };
     };
     const ownBalance = sideBalance(ownTeam?.id);
+    const completedTeamMatches = (teamId) =>
+      matches
+        .filter(
+          (match) =>
+            match.status === "completed" &&
+            match.result &&
+            match.participantTeamIds?.includes(teamId),
+        )
+        .sort((first, second) =>
+          `${second.matchDate || ""}`.localeCompare(`${first.matchDate || ""}`),
+        );
+    const recentResultsFor = (teamId) =>
+      completedTeamMatches(teamId)
+        .slice(0, 8)
+        .map((match) => {
+          const home = match.homeTeamId === teamId;
+          const ownScore = Number(
+            home ? match.result?.homeScore : match.result?.awayScore,
+          );
+          const otherScore = Number(
+            home ? match.result?.awayScore : match.result?.homeScore,
+          );
+          return ownScore === otherScore
+            ? "draw"
+            : ownScore > otherScore
+              ? "win"
+              : "loss";
+        });
+    const historyBetween = (opponentId) =>
+      completedTeamMatches(ownTeam?.id)
+        .filter((match) => match.participantTeamIds?.includes(opponentId))
+        .map((match) => ({
+          daysAgo: Math.max(
+            0,
+            Math.floor(
+              (Date.now() - new Date(`${match.matchDate}T12:00:00`).getTime()) /
+                86400000,
+            ),
+          ),
+          homeScore: Number(match.result?.homeScore || 0),
+          awayScore: Number(match.result?.awayScore || 0),
+        }));
+    const acceptanceRateFor = (teamId) => {
+      const decisions = challenges.filter(
+        (challenge) =>
+          challenge.recipientTeamId === teamId &&
+          ["accepted", "declined", "rejected", "completed"].includes(
+            challenge.status,
+          ),
+      );
+      if (!decisions.length) return 0.6;
+      return (
+        decisions.filter((challenge) =>
+          ["accepted", "completed"].includes(challenge.status),
+        ).length / decisions.length
+      );
+    };
+    const slotAcceptanceFor = (teamId) => {
+      const decisions = challenges.filter(
+        (challenge) =>
+          challenge.recipientTeamId === teamId &&
+          ["accepted", "declined", "rejected", "completed"].includes(
+            challenge.status,
+          ),
+      );
+      const grouped = {};
+      decisions.forEach((challenge) => {
+        const date = new Date(`${challenge.terms?.day || ""}T12:00:00`);
+        if (Number.isNaN(date.getTime())) return;
+        const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
+        const hour = Number(String(challenge.terms?.time || "12:00").split(":")[0]);
+        const period = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening";
+        const key = `${weekday}-${period}`;
+        const record = grouped[key] || { accepted: 0, total: 0 };
+        record.total += 1;
+        if (["accepted", "completed"].includes(challenge.status))
+          record.accepted += 1;
+        grouped[key] = record;
+      });
+      return Object.fromEntries(
+        Object.entries(grouped).map(([key, record]) => [
+          key,
+          record.accepted / record.total,
+        ]),
+      );
+    };
+    const rescheduleFlexibilityFor = (teamId) => {
+      const decisions = matches.filter(
+        (match) =>
+          match.participantTeamIds?.includes(teamId) &&
+          match.rescheduleStatus &&
+          match.rescheduleRespondingTeamId === teamId,
+      );
+      if (!decisions.length) return 0.65;
+      return (
+        decisions.filter((match) =>
+          ["accepted", "approved"].includes(match.rescheduleStatus),
+        ).length / decisions.length
+      );
+    };
+    const opponentsPlayedBy = (teamId) =>
+      new Set(
+        completedTeamMatches(teamId).flatMap((match) =>
+          (match.participantTeamIds || []).filter((id) => id !== teamId),
+        ),
+      );
+    const ownOpponentNetwork = opponentsPlayedBy(ownTeam?.id);
+    const sharedTrustFor = (teamId) => {
+      const opponentNetwork = opponentsPlayedBy(teamId);
+      const sharedOpponents = [...ownOpponentNetwork].filter((id) =>
+        opponentNetwork.has(id),
+      ).length;
+      const ownReferees = new Set(
+        completedTeamMatches(ownTeam?.id)
+          .map((match) => match.refereeId)
+          .filter(Boolean),
+      );
+      const sharedReferees = new Set(
+        completedTeamMatches(teamId)
+          .map((match) => match.refereeId)
+          .filter((id) => id && ownReferees.has(id)),
+      ).size;
+      return sharedOpponents + sharedReferees;
+    };
     const searchTeam = {
       id: ownTeam?.id || "current-team",
       area: ownTeam?.area || "",
-      rating: 1110,
+      rating: Number(ownTeam?.stats?.rankingScore || 1000),
       ageBand: ownTeam?.ageGroup || "Senior",
+      matchesPlayed: completedTeamMatches(ownTeam?.id).length,
+      recentResults: recentResultsFor(ownTeam?.id),
+      acceptRate: acceptanceRateFor(ownTeam?.id),
+      acceptRateBySlot: slotAcceptanceFor(ownTeam?.id),
+      rescheduleFlexibility: rescheduleFlexibilityFor(ownTeam?.id),
       ...ownBalance,
       travelKm30: 60,
       matchBudget: 45,
@@ -8039,12 +8154,12 @@ function FriendlyFinder({
             : challenge.senderTeamId,
         ),
     );
-    const distanceLimit =
-      maxDistance === "Any distance"
-        ? Infinity
-        : Number(maxDistance.split(" ")[0]);
     const candidates = teams
-      .filter((item) => !activeOpponentIds.has(item.id))
+      .filter(
+        (item) =>
+          !activeOpponentIds.has(item.id) &&
+          sameFootballCategory(item, ownTeam),
+      )
       .map((item, index) => {
         const post = availabilityPosts.find(
           (availability) =>
@@ -8066,6 +8181,12 @@ function FriendlyFinder({
           ...item,
           rating: Number(item.stats?.rankingScore || 1000),
           ageBand: item.ageGroup || ownTeam?.ageGroup || "Senior",
+          matchesPlayed: completedTeamMatches(item.id).length,
+          recentResults: recentResultsFor(item.id),
+          acceptRate: acceptanceRateFor(item.id),
+          acceptRateBySlot: slotAcceptanceFor(item.id),
+          rescheduleFlexibility: rescheduleFlexibilityFor(item.id),
+          sharedTrustedConnections: sharedTrustFor(item.id),
           ...sideBalance(item.id),
           travelKm30: Number(item.travelKm30 || 0),
           distanceKm,
@@ -8078,7 +8199,19 @@ function FriendlyFinder({
             available: availabilityFits && playerIndex < 14,
           })),
           behaviour: item.behaviour || [],
-          historyWithTeam: item.historyWithTeam || [],
+          historyWithTeam: historyBetween(item.id),
+          declinesWithTeam: challenges
+            .filter(
+              (challenge) =>
+                ["declined", "rejected"].includes(challenge.status) &&
+                [challenge.senderTeamId, challenge.recipientTeamId].includes(
+                  ownTeam?.id,
+                ) &&
+                [challenge.senderTeamId, challenge.recipientTeamId].includes(
+                  item.id,
+                ),
+            )
+            .map(() => ({ daysAgo: 0 })),
           busyMatch: matches.find(
             (match) =>
               ["confirmed", "result_pending", "result_disputed"].includes(
@@ -8089,18 +8222,19 @@ function FriendlyFinder({
               match.kickoff === searchTime,
           ),
         };
-      })
-      .filter(
-        (item) =>
-          distanceLimit === Infinity ||
-          (item.distanceKm !== null && item.distanceKm <= distanceLimit),
-      );
+      });
     setTimeout(() => {
       const availableCandidates = candidates.filter(
         (candidate) => !candidate.busyMatch,
       );
       const busyCandidates = candidates
-        .filter((candidate) => candidate.busyMatch)
+        .filter(
+          (candidate) =>
+            candidate.busyMatch &&
+            (candidate.distanceKm !== null
+              ? candidate.distanceKm <= 10
+              : locationZone(candidate.area) === locationZone(ownTeam?.area)),
+        )
         .map((opponent) => ({ opponent, score: -1, signals: {} }));
       setResults(
         [
@@ -8119,6 +8253,7 @@ function FriendlyFinder({
               referee: 10,
               transport: venue === "Can travel" ? 15 : 0,
             },
+            resultLimit: 8,
           }).sort(
             (first, second) =>
               Number(second.opponent.availabilityFits) -
@@ -8153,12 +8288,6 @@ function FriendlyFinder({
             ["Day", ["Saturday", "Sunday"], day, setDay],
             ["Kick-off", ["Morning", "Afternoon", "Evening"], time, setTime],
             ["Venue", ["Can host", "Can travel", "Either"], venue, setVenue],
-            [
-              "Distance",
-              ["10 km", "25 km", "50 km", "Any distance"],
-              maxDistance,
-              setMaxDistance,
-            ],
           ].map(([label, choices, value, setter]) => (
             <View key={label}>
               <AppText style={s.formLabel}>{label}</AppText>
@@ -8198,6 +8327,16 @@ function FriendlyFinder({
               ) : null}
             </View>
           ))}
+          <View style={s.adaptiveAreaCard}>
+            <Ionicons name="location-outline" size={21} color={C.red} />
+            <View style={{ flex: 1 }}>
+              <AppText style={s.team}>Local area adjusts automatically</AppText>
+              <AppText style={s.body}>
+                Search starts nearby. It expands after suitable local opponents
+                have been played, while struggling teams stay mostly local.
+              </AppText>
+            </View>
+          </View>
           <Pressable onPress={runMatch} style={s.saveLineupButton}>
             <Ionicons name="search" color="white" size={18} />
             <AppText style={s.saveLineupText}>FIND TEAMS</AppText>
@@ -8220,6 +8359,30 @@ function FriendlyFinder({
           <AppText style={s.body}>
             Ranked privately by fit. Reliability percentages remain hidden.
           </AppText>
+          {results[0]?.policy ? (
+            <View style={s.searchPolicyCard}>
+              <Ionicons name="compass-outline" size={20} color={C.red} />
+              <View style={{ flex: 1 }}>
+                <AppText style={s.team}>
+                  {results[0].policy.onboarding
+                    ? "First matches stay close to home"
+                    : results[0].policy.struggling
+                      ? "Mostly familiar, competitive local games"
+                      : results[0].policy.strong
+                        ? "A wider challenge pool is open"
+                        : results[0].policy.localExhausted
+                          ? "Local pool played, search widened"
+                          : "Nearby teams first"}
+                </AppText>
+                <AppText style={s.body}>
+                  Searching up to {results[0].policy.radiusKm} km ·{" "}
+                  {results[0].policy.recentlyPlayedLocal} of{" "}
+                  {results[0].policy.localPoolSize} suitable local teams played
+                  recently
+                </AppText>
+              </View>
+            </View>
+          ) : null}
           {results.map(({ opponent }, index) => (
             <View key={opponent.id} style={s.friendlyResult}>
               <View style={s.friendlyResultTop}>
@@ -8450,7 +8613,7 @@ function PublicTeamStatsProfile({ team, matches = [], leagues = [], period }) {
           <AppText style={s.h2}>{team.name}</AppText>
           <AppText style={s.body}>
             {team.area || "Region not added"} Â·{" "}
-            {team.ageGroup || "Age group not added"}
+            {footballCategory(team)} · {team.ageGroup || "Age group not added"}
           </AppText>
         </View>
       </View>
@@ -8569,6 +8732,9 @@ function Community({
   const [playerMetric, setPlayerMetric] = useState("Goals");
   const [regionFilter, setRegionFilter] = useState("All regions");
   const [ageFilter, setAgeFilter] = useState("All ages");
+  const [categoryFilter, setCategoryFilter] = useState(() =>
+    team ? footballCategory(team) : "All categories",
+  );
   const activeOpponentIds = new Set(
     challenges
       .filter(
@@ -8586,7 +8752,10 @@ function Community({
   );
   const visibleTeams = prioritizeByLocation(
     teams.filter(
-      (item) => item.id !== team?.id && !activeOpponentIds.has(item.id),
+      (item) =>
+        item.id !== team?.id &&
+        !activeOpponentIds.has(item.id) &&
+        sameFootballCategory(item, team),
     ),
     team?.area,
   ).sort((first, second) => {
@@ -8625,7 +8794,15 @@ function Community({
       regionFilter === "All regions" ||
       titleLabel(locationZone(item.area)) === regionFilter;
     const itemAge = item.ageGroup || item.ageBand || "";
-    return sameRegion && (ageFilter === "All ages" || itemAge === ageFilter);
+    const sameCategory =
+      categoryFilter === "All categories" ||
+      item.role === "Player" ||
+      footballCategory(item) === categoryFilter;
+    return (
+      sameRegion &&
+      sameCategory &&
+      (ageFilter === "All ages" || itemAge === ageFilter)
+    );
   };
   const rankingTeams = allRankingTeams
     .filter(matchesStatFilters)
@@ -8656,7 +8833,7 @@ function Community({
         Number(secondStats.goalsAgainst || 0);
       return secondDifference - firstDifference;
     });
-  const standingsTeams = [...allRankingTeams].sort((first, second) => {
+  const standingsTeams = allRankingTeams.filter(matchesStatFilters).sort((first, second) => {
     const firstStats = teamStatsForPeriod(first, matches, "All time");
     const secondStats = teamStatsForPeriod(second, matches, "All time");
     const pointsGap =
@@ -8730,6 +8907,9 @@ function Community({
       onFinderOpened?.();
     }
   }, [startFinder, onFinderOpened]);
+  useEffect(() => {
+    if (team?.id) setCategoryFilter(footballCategory(team));
+  }, [team?.id, team?.teamCategory]);
   if (challengeTeam) {
     const availability = availabilityPosts.find(
       (post) => post.teamId === challengeTeam.id,
@@ -8914,7 +9094,8 @@ function Community({
                         <AppText style={s.team}>{item.name}</AppText>
                         <AppText style={s.meta}>
                           {item.area || "Area not added"} ·{" "}
-                          {item.stats?.players ?? 0} players
+                          {footballCategory(item)} · {item.stats?.players ?? 0}{" "}
+                          players
                         </AppText>
                         {conflictingMatch ? (
                           <View style={s.teamTrustLine}>
@@ -9009,6 +9190,12 @@ function Community({
                   </AppText>
                 </View>
               </View>
+              <AppText style={s.statsFilterLabel}>CATEGORY</AppText>
+              <StatsChoiceControl
+                options={["All categories", ...FOOTBALL_CATEGORIES]}
+                value={categoryFilter}
+                onChange={setCategoryFilter}
+              />
               {standingsTeams.length ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator>
                   <View>
@@ -9067,6 +9254,19 @@ function Community({
                   setRankingTeam(null);
                 }}
               />
+              {statsLevel === "Teams" ? (
+                <>
+                  <AppText style={s.statsFilterLabel}>CATEGORY</AppText>
+                  <StatsChoiceControl
+                    options={["All categories", ...FOOTBALL_CATEGORIES]}
+                    value={categoryFilter}
+                    onChange={(category) => {
+                      setCategoryFilter(category);
+                      setRankingTeam(null);
+                    }}
+                  />
+                </>
+              ) : null}
               <AppText style={s.statsFilterLabel}>REGION</AppText>
               <StatsChoiceControl
                 options={regionOptions}
@@ -9729,8 +9929,14 @@ function LegacyCreateLeagueScreen({ close, onCreateLeague }) {
   );
 }
 
-function CreateLeagueScreen({ close, onCreateLeague, publicProfiles = [] }) {
+function CreateLeagueScreen({
+  close,
+  onCreateLeague,
+  publicProfiles = [],
+  team,
+}) {
   const [name, setName] = useState("");
+  const [competitionCategory] = useState(footballCategory(team));
   const [competitionType, setCompetitionType] = useState("Round robin");
   const [fixtureCycle, setFixtureCycle] = useState("Play once");
   const [format, setFormat] = useState("11 a side");
@@ -9805,6 +10011,17 @@ function CreateLeagueScreen({ close, onCreateLeague, publicProfiles = [] }) {
           placeholder="Competition name"
           placeholderTextColor={C.muted}
         />
+        <View style={s.competitionCategoryCard}>
+          <View style={s.statsScopeIcon}>
+            <Ionicons name="people-outline" size={21} color={C.red} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText style={s.team}>{competitionCategory} competition</AppText>
+            <AppText style={s.body}>
+              Matches your active team. Only teams in this category can join.
+            </AppText>
+          </View>
+        </View>
         <ProfileChoiceGroup
           label="Competition type"
           options={[
@@ -10188,6 +10405,7 @@ function CreateLeagueScreen({ close, onCreateLeague, publicProfiles = [] }) {
             try {
               await onCreateLeague({
                 name: name.trim(),
+                competitionCategory,
                 competitionType,
                 fixtureCycle,
                 format,
@@ -10723,9 +10941,21 @@ function DropdownField({
   options,
   placeholder,
   disabled = false,
+  searchable = false,
+  loading = false,
   onChange,
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const visibleOptions = searchable
+    ? options.filter((option) =>
+        option.toLowerCase().includes(query.trim().toLowerCase()),
+      )
+    : options;
+  const closeDropdown = () => {
+    setOpen(false);
+    setQuery("");
+  };
   return (
     <>
       <AppText style={s.formLabel}>{label}</AppText>
@@ -10747,7 +10977,7 @@ function DropdownField({
           {value || placeholder}
         </AppText>
         <Ionicons
-          name="chevron-down"
+          name={loading ? "hourglass-outline" : "chevron-down"}
           size={18}
           color={disabled ? C.line : C.red}
         />
@@ -10756,9 +10986,9 @@ function DropdownField({
         visible={open}
         transparent
         animationType="fade"
-        onRequestClose={() => setOpen(false)}
+        onRequestClose={closeDropdown}
       >
-        <Pressable style={s.dropdownBackdrop} onPress={() => setOpen(false)}>
+        <Pressable style={s.dropdownBackdrop} onPress={closeDropdown}>
           <Pressable style={s.dropdownSheet} onPress={() => {}}>
             <View style={s.dropdownSheetHeader}>
               <View style={{ flex: 1 }}>
@@ -10766,7 +10996,7 @@ function DropdownField({
                 <AppText style={s.meta}>{placeholder}</AppText>
               </View>
               <Pressable
-                onPress={() => setOpen(false)}
+                onPress={closeDropdown}
                 accessibilityRole="button"
                 accessibilityLabel={`Close ${label}`}
                 style={s.dropdownClose}
@@ -10774,18 +11004,40 @@ function DropdownField({
                 <Ionicons name="close" size={21} color={C.ink} />
               </Pressable>
             </View>
+            {searchable ? (
+              <View style={s.dropdownSearchWrap}>
+                <Ionicons name="search" size={19} color={C.muted} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  autoFocus
+                  style={s.dropdownSearchInput}
+                  placeholder={`Search ${label.toLowerCase()}`}
+                  placeholderTextColor={C.muted}
+                />
+                {query ? (
+                  <Pressable
+                    onPress={() => setQuery("")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear search"
+                  >
+                    <Ionicons name="close-circle" size={20} color={C.muted} />
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
             <ScrollView
               style={s.dropdownOptions}
               keyboardShouldPersistTaps="handled"
             >
-              {options.map((option) => {
+              {visibleOptions.map((option) => {
                 const selected = option === value;
                 return (
                   <Pressable
                     key={option}
                     onPress={() => {
                       onChange(option);
-                      setOpen(false);
+                      closeDropdown();
                     }}
                     style={[
                       s.dropdownOption,
@@ -10808,6 +11060,12 @@ function DropdownField({
                   </Pressable>
                 );
               })}
+              {!visibleOptions.length ? (
+                <View style={s.dropdownEmpty}>
+                  <AppText style={s.team}>No matching place</AppText>
+                  <AppText style={s.meta}>Try a shorter search.</AppText>
+                </View>
+              ) : null}
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -10817,9 +11075,85 @@ function DropdownField({
 }
 
 function TeamRegionFields({ value, onChange }) {
-  const countries = Object.keys(TEAM_REGION_TREE);
-  const provinces = Object.keys(TEAM_REGION_TREE[value.country] || {});
-  const cities = TEAM_REGION_TREE[value.country]?.[value.province] || [];
+  const [countries, setCountries] = useState(fallbackCountries());
+  const [provinces, setProvinces] = useState(() =>
+    fallbackProvinces(value.country),
+  );
+  const [cities, setCities] = useState(() =>
+    fallbackCities(value.country, value.province),
+  );
+  const [loadingLevel, setLoadingLevel] = useState("countries");
+  const [locationListMessage, setLocationListMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    loadLocationCountries()
+      .then((items) => active && setCountries(items))
+      .catch(() => {
+        if (active)
+          setLocationListMessage(
+            "Showing saved nearby places. More places will appear when the connection improves.",
+          );
+      })
+      .finally(() => active && setLoadingLevel(""));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!value.country) {
+      setProvinces([]);
+      setCities([]);
+      return;
+    }
+    let active = true;
+    const localItems = fallbackProvinces(value.country);
+    setProvinces(localItems);
+    setLoadingLevel("provinces");
+    loadLocationProvinces(value.country)
+      .then((items) => active && setProvinces(items))
+      .catch(() => {
+        if (active && !localItems.length)
+          setLocationListMessage(
+            "Province list could not load. Check the connection and choose the country again.",
+          );
+      })
+      .finally(() => active && setLoadingLevel(""));
+    return () => {
+      active = false;
+    };
+  }, [value.country]);
+
+  useEffect(() => {
+    if (!value.country || !value.province) {
+      setCities([]);
+      return;
+    }
+    let active = true;
+    const localItems = fallbackCities(value.country, value.province);
+    const provinceRecord = provinces.find(
+      (item) => item.name === value.province,
+    );
+    setCities(localItems);
+    setLoadingLevel("cities");
+    loadLocationCities(
+      value.country,
+      provinceRecord?.apiName || value.province,
+    )
+      .then((items) => active && setCities(items))
+      .catch(() => {
+        if (active && !localItems.length)
+          setLocationListMessage(
+            "City and town list could not load. Check the connection and choose the province again.",
+          );
+      })
+      .finally(() => active && setLoadingLevel(""));
+    return () => {
+      active = false;
+    };
+  }, [value.country, value.province, provinces]);
+
   return (
     <>
       <DropdownField
@@ -10827,18 +11161,23 @@ function TeamRegionFields({ value, onChange }) {
         options={countries}
         value={value.country}
         placeholder="Choose country"
-        onChange={(country) =>
-          onChange({ country, province: "", city: "", suburb: "" })
-        }
+        searchable
+        loading={loadingLevel === "countries"}
+        onChange={(country) => {
+          setLocationListMessage("");
+          onChange({ country, province: "", city: "", suburb: "" });
+        }}
       />
       <DropdownField
         label="Province"
-        options={provinces}
+        options={provinces.map((item) => item.name)}
         value={value.province}
         placeholder={
           value.country ? "Choose province" : "Choose a country first"
         }
         disabled={!value.country}
+        searchable
+        loading={loadingLevel === "provinces"}
         onChange={(province) =>
           onChange({ ...value, province, city: "", suburb: "" })
         }
@@ -10851,8 +11190,13 @@ function TeamRegionFields({ value, onChange }) {
           value.province ? "Choose city or town" : "Choose a province first"
         }
         disabled={!value.province}
+        searchable
+        loading={loadingLevel === "cities"}
         onChange={(city) => onChange({ ...value, city, suburb: "" })}
       />
+      {locationListMessage ? (
+        <AppText style={s.locationListMessage}>{locationListMessage}</AppText>
+      ) : null}
       <AppText style={s.formLabel}>Suburb or local area</AppText>
       <TextInput
         value={value.suburb}
@@ -10960,6 +11304,109 @@ function ColourWheelPicker({ value, onChange }) {
   );
 }
 
+const TEAM_COLOUR_FAMILIES = [
+  { name: "Purple", shades: ["#E9DEFF", "#B89AF5", "#6C2BEA", "#5120B2", "#35106B"] },
+  { name: "Blue", shades: ["#DDEBFF", "#8EBDF2", "#2878C8", "#18558E", "#10395F"] },
+  { name: "Sky blue", shades: ["#DDF6FF", "#8EDDF4", "#22A7CF", "#147A9B", "#0B5066"] },
+  { name: "Green", shades: ["#DDF5E8", "#87D4AA", "#168A53", "#0F643D", "#093E26"] },
+  { name: "Lime", shades: ["#F1FFD4", "#D5F58E", "#9BCB35", "#6F9820", "#486312"] },
+  { name: "Yellow", shades: ["#FFF7CC", "#FFE67A", "#F2C515", "#B99008", "#755B00"] },
+  { name: "Orange", shades: ["#FFE7D7", "#F7AE79", "#F07C37", "#B7531C", "#71300D"] },
+  { name: "Red", shades: ["#FFE0E4", "#F2949F", "#D93B4B", "#A22231", "#66131D"] },
+  { name: "Pink", shades: ["#FFE0F0", "#F39AC8", "#D44691", "#9E2768", "#641640"] },
+  { name: "Brown", shades: ["#F0E1D5", "#C69A79", "#8A5735", "#603B24", "#3B2315"] },
+  { name: "Grey", shades: ["#F2F1F3", "#BEB9C2", "#77707D", "#49434E", "#211E24"] },
+  { name: "White", shades: ["#FFFFFF", "#F4F1ED", "#E2DED8", "#C9C4BD", "#AAA39A"] },
+];
+
+const SHADE_NAMES = ["Soft", "Light", "Bright", "Deep", "Dark"];
+
+function TeamColourPicker({ value, onChange }) {
+  const selectedFamilyIndex = Math.max(
+    0,
+    TEAM_COLOUR_FAMILIES.findIndex((family) => family.shades.includes(value)),
+  );
+  const selectedFamily = TEAM_COLOUR_FAMILIES[selectedFamilyIndex];
+  const shadeIndex = Math.max(0, selectedFamily.shades.indexOf(value));
+  return (
+    <View style={s.teamColourPicker}>
+      <View style={s.teamColourSelection}>
+        <View style={[s.teamColourPreview, { backgroundColor: value }]} />
+        <View style={{ flex: 1 }}>
+          <AppText style={s.teamColourName}>
+            {SHADE_NAMES[shadeIndex]} {selectedFamily.name.toLowerCase()}
+          </AppText>
+          <AppText style={s.meta}>Choose a colour, then choose its shade</AppText>
+        </View>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.teamColourFamilies}
+      >
+        {TEAM_COLOUR_FAMILIES.map((family, index) => {
+          const selected = index === selectedFamilyIndex;
+          return (
+            <Pressable
+              key={family.name}
+              onPress={() => onChange(family.shades[Math.min(shadeIndex, 4)])}
+              style={s.teamColourFamily}
+              accessibilityRole="button"
+              accessibilityLabel={family.name}
+              accessibilityState={{ selected }}
+            >
+              <View
+                style={[
+                  s.teamColourFamilyCircle,
+                  { backgroundColor: family.shades[2] },
+                  selected && s.teamColourFamilyCircleSelected,
+                ]}
+              >
+                {selected ? (
+                  <Ionicons name="checkmark" size={18} color={C.white} />
+                ) : null}
+              </View>
+              <AppText
+                style={[
+                  s.teamColourFamilyName,
+                  selected && s.teamColourFamilyNameSelected,
+                ]}
+              >
+                {family.name}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <AppText style={s.formLabel}>Shade</AppText>
+      <View style={s.teamColourShades}>
+        {selectedFamily.shades.map((colour, index) => (
+          <Pressable
+            key={colour}
+            onPress={() => onChange(colour)}
+            style={[
+              s.teamColourShade,
+              { backgroundColor: colour },
+              index === shadeIndex && s.teamColourShadeSelected,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`${SHADE_NAMES[index]} ${selectedFamily.name}`}
+            accessibilityState={{ selected: index === shadeIndex }}
+          >
+            {index === shadeIndex ? (
+              <Ionicons
+                name="checkmark"
+                size={20}
+                color={index < 2 || selectedFamily.name === "White" ? C.ink : C.white}
+              />
+            ) : null}
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const normaliseLiveAddress = (address, current) => {
   const normalise = (value) =>
     String(value || "")
@@ -11023,13 +11470,13 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
   const [coachName, setCoachName] = useState("");
   const [location, setLocation] = useState(savedTeamLocation());
   const [ageGroup, setAgeGroup] = useState("Senior");
+  const [teamCategory, setTeamCategory] = useState("Men's");
   const [sponsor, setSponsor] = useState("");
   const [groundCoordinate, setGroundCoordinate] = useState({
     latitude: -17.8249,
     longitude: 31.053,
   });
-  const [wheelBadgeColor, setWheelBadgeColor] = useState("#6C2BEA");
-  const [customBadgeColor, setCustomBadgeColor] = useState("");
+  const [badgeColor, setBadgeColor] = useState("#6C2BEA");
   const [badgeShape, setBadgeShape] = useState(0);
   const [kits, setKits] = useState([null, null, null]);
   const [activeKit, setActiveKit] = useState(null);
@@ -11047,9 +11494,7 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
   const [saveError, setSaveError] = useState("");
   const saveLock = useRef(false);
   const area = teamLocationLabel(location);
-  const selectedBadgeColor = /^#[0-9A-F]{6}$/i.test(customBadgeColor)
-    ? customBadgeColor
-    : wheelBadgeColor;
+  const selectedBadgeColor = badgeColor;
   const palette = [
     "#6C2BEA",
     "#B9F34A",
@@ -11131,10 +11576,10 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
     setCoachName("");
     setLocation(savedTeamLocation());
     setAgeGroup("Senior");
+    setTeamCategory("Men's");
     setSponsor("");
     setGroundCoordinate({ latitude: -17.8249, longitude: 31.053 });
-    setWheelBadgeColor("#6C2BEA");
-    setCustomBadgeColor("");
+    setBadgeColor("#6C2BEA");
     setBadgeShape(0);
     setKits([null, null, null]);
     setActiveKit(null);
@@ -11167,6 +11612,7 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
         area,
         location,
         ageGroup,
+        teamCategory,
         coachName,
         sponsor,
         crest: {
@@ -11245,6 +11691,7 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
             {kits.filter(Boolean).length}/3 kits designed ·{" "}
             {area || "Area not added"}
           </AppText>
+          <AppText style={s.meta}>{teamCategory} · {ageGroup}</AppText>
           <AppText style={s.teamCreatorCoach}>
             Coach {coachName || "not added"}
           </AppText>
@@ -11291,6 +11738,15 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
           value={ageGroup}
           onChange={setAgeGroup}
         />
+        <ProfileChoiceGroup
+          label="Team category"
+          options={FOOTBALL_CATEGORIES}
+          value={teamCategory}
+          onChange={setTeamCategory}
+        />
+        <AppText style={s.formHelp}>
+          Friendlies, rankings and competition entry use this category.
+        </AppText>
         <AppText style={s.formLabel}>Kit sponsor</AppText>
         <TextInput
           value={sponsor}
@@ -11332,27 +11788,13 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
           ))}
         </View>
         <AppText style={s.formLabel}>Badge colour</AppText>
-        <ColourWheelPicker
+        <TeamColourPicker
           value={selectedBadgeColor}
           onChange={(color) => {
-            setWheelBadgeColor(color);
-            setCustomBadgeColor("");
+            setBadgeColor(color);
             setSaved(false);
           }}
         />
-        <AppText style={s.formLabel}>Exact colour</AppText>
-        <TextInput
-          value={customBadgeColor}
-          onChangeText={(value) => setCustomBadgeColor(value.toUpperCase())}
-          autoCapitalize="characters"
-          maxLength={7}
-          placeholder="#6C2BEA"
-          placeholderTextColor={C.muted}
-          style={s.formInput}
-        />
-        <AppText style={s.formHelp}>
-          Enter any six-digit colour code, or spin through the full spectrum.
-        </AppText>
       </View>
       <View style={s.formSection}>
         <AppText style={s.formSectionTitle}>Team kits</AppText>
@@ -11825,6 +12267,10 @@ function TeamSettingsScreen({ team, close, onUpdateTeam }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(team.name || "");
   const [location, setLocation] = useState(savedTeamLocation(team));
+  const [ageGroup, setAgeGroup] = useState(team.ageGroup || "Senior");
+  const [teamCategory, setTeamCategory] = useState(
+    footballCategory(team),
+  );
   const [sponsor, setSponsor] = useState(team.sponsor || "");
   const [groundName, setGroundName] = useState(team.ground?.name || "");
   const [coordinate, setCoordinate] = useState(
@@ -11847,6 +12293,8 @@ function TeamSettingsScreen({ team, close, onUpdateTeam }) {
         name: name.trim(),
         area: area.trim(),
         location,
+        ageGroup,
+        teamCategory,
         sponsor: sponsor.trim(),
         ground: { name: groundName.trim(), coordinate },
       });
@@ -11887,6 +12335,9 @@ function TeamSettingsScreen({ team, close, onUpdateTeam }) {
             <AppText style={s.squadTeamMeta}>
               {team.area || "No home area added"}
             </AppText>
+            <AppText style={s.meta}>
+              {footballCategory(team)} · {team.ageGroup || "Senior"}
+            </AppText>
           </View>
         </View>
         <View style={s.playerMetricRow}>
@@ -11904,6 +12355,8 @@ function TeamSettingsScreen({ team, close, onUpdateTeam }) {
         </View>
         <View style={s.communityListSection}>
           {[
+            ["Category", footballCategory(team)],
+            ["Age group", team.ageGroup || "Senior"],
             ["Home ground", team.ground?.name || "Not added"],
             ["Coach", team.coachName || "Not added"],
             ["Sponsor", team.sponsor || "Not added"],
@@ -11972,6 +12425,18 @@ function TeamSettingsScreen({ team, close, onUpdateTeam }) {
         </View>
         <AppText style={s.formLabel}>Team name</AppText>
         <TextInput value={name} onChangeText={setName} style={s.formInput} />
+        <ProfileChoiceGroup
+          label="Team category"
+          options={FOOTBALL_CATEGORIES}
+          value={teamCategory}
+          onChange={setTeamCategory}
+        />
+        <ProfileChoiceGroup
+          label="Age group"
+          options={["U13", "U15", "U17", "U20", "Senior", "Veterans"]}
+          value={ageGroup}
+          onChange={setAgeGroup}
+        />
         <TeamRegionFields value={location} onChange={setLocation} />
         <AppText style={s.formLabel}>Kit sponsor</AppText>
         <TextInput
@@ -13291,7 +13756,8 @@ function MoreDetail({
               <View style={{ flex: 1 }}>
                 <AppText style={s.squadTeamName}>{team.name}</AppText>
                 <AppText style={s.squadTeamMeta}>
-                  {team.ageGroup || "Senior"} · {team.area || "Area not added"}
+                  {footballCategory(team)} · {team.ageGroup || "Senior"} ·{" "}
+                  {team.area || "Area not added"}
                 </AppText>
               </View>
             </View>
@@ -13828,6 +14294,8 @@ function MoreDetail({
                 itemMatches.every((match) => match.status === "completed");
               const leagueIsFull =
                 joinedTeamCount >= Number(item.maxTeams || Infinity);
+              const categoryMismatch =
+                Boolean(team?.id) && !sameFootballCategory(item, team);
               return (
                 <Pressable
                   style={s.league}
@@ -13841,6 +14309,9 @@ function MoreDetail({
                   </View>
                   <View style={{ flex: 1 }}>
                     <AppText style={s.team}>{item.name}</AppText>
+                    <AppText style={s.categoryBadgeText}>
+                      {footballCategory(item)}
+                    </AppText>
                     <AppText style={s.meta}>
                       {item.competitionType || "Round robin"} · {item.format}
                   </AppText>
@@ -13874,6 +14345,7 @@ function MoreDetail({
                         competitionComplete ||
                         item.teamIds?.includes(team.id) ||
                         leagueIsFull ||
+                        categoryMismatch ||
                         (item.visibility === "private" &&
                           !(item.invitedUserIds || []).includes(currentUid))
                       }
@@ -13893,6 +14365,8 @@ function MoreDetail({
                           ? "COMPLETED"
                           : item.teamIds?.includes(team?.id)
                             ? "JOINED"
+                          : categoryMismatch
+                            ? "OTHER CATEGORY"
                           : item.visibility === "private" &&
                               !(item.invitedUserIds || []).includes(currentUid)
                             ? "INVITE ONLY"
@@ -16032,6 +16506,7 @@ function More({
         close={() => setSection("Leagues")}
         onCreateLeague={onCreateLeague}
         publicProfiles={publicProfiles}
+        team={team}
       />
     );
   if (section === "Create Team")
@@ -16261,6 +16736,357 @@ const ENTRY_ROLES = [
   ["Sponsor", "business-outline"],
   ["Scout", "eye-outline"],
 ];
+
+const ENTRY_ROLE_DETAILS = {
+  Coach: {
+    title: "Organise your team",
+    copy: "Build a squad, find suitable opponents and keep match details in one place.",
+  },
+  Player: {
+    title: "Find your place to play",
+    copy: "Create your football profile, connect with a team and follow the matches that involve you.",
+  },
+  Referee: {
+    title: "Be ready for the right games",
+    copy: "Share your availability, agree expectations early and build a clear match record.",
+  },
+  Sponsor: {
+    title: "Back football that is close to home",
+    copy: "Discover local teams, tournaments and players before starting a conversation.",
+  },
+  Scout: {
+    title: "Follow local potential",
+    copy: "Search by area and football details, keep a watchlist and request a safe introduction.",
+  },
+};
+
+const WELCOME_STEPS = [
+  {
+    number: "01",
+    icon: "location-outline",
+    title: "Find the right people nearby",
+    copy: "Location, date, age group and playing level come before endless scrolling.",
+  },
+  {
+    number: "02",
+    icon: "shield-checkmark-outline",
+    title: "Agree the real details",
+    copy: "Time, ground, fees, rules and referee decisions stay visible to both sides.",
+  },
+  {
+    number: "03",
+    icon: "football-outline",
+    title: "Play, confirm, remember",
+    copy: "Results and useful football records grow only after the people involved confirm them.",
+  },
+];
+
+function MarketingWelcome({
+  role,
+  setRole,
+  onGuest,
+  onSignIn,
+  onSignUp,
+  isWide,
+}) {
+  const selectedRole = role ? ENTRY_ROLE_DETAILS[role] : null;
+
+  return (
+    <SafeAreaView style={s.authSafe}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView
+        contentContainerStyle={s.marketingScreen}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={s.marketingInner}>
+          <View style={s.authBrandRow}>
+            <View style={s.authMark}>
+              <AppText style={s.authMarkText}>G</AppText>
+            </View>
+            <View>
+              <AppText style={s.authBrand}>GRASSROOTS</AppText>
+              <AppText style={s.authBrandSub}>
+                ZIMBABWE · OUR FOOTBALL
+              </AppText>
+            </View>
+          </View>
+
+          <View style={[s.marketingHero, isWide && s.marketingHeroWide]}>
+            <View style={[s.marketingHeroCopy, isWide && s.marketingHeroCopyWide]}>
+              <View style={s.authGuestPromise}>
+                <Ionicons name="eye-outline" size={15} color={C.gold} />
+                <AppText style={s.authGuestPromiseText}>
+                  LOOK AROUND BEFORE YOU SIGN UP
+                </AppText>
+              </View>
+              <AppText style={[s.marketingTitle, isWide && s.marketingTitleWide]}>
+                Zimbabwe’s football, organised around the people who play it.
+              </AppText>
+              <AppText style={s.marketingIntro}>
+                Find nearby teams and opportunities, agree the important
+                details and keep everyone ready for the same kickoff.
+              </AppText>
+              <View style={s.marketingHeroFacts}>
+                <View style={s.marketingHeroFact}>
+                  <Ionicons name="location-outline" size={17} color={C.gold} />
+                  <AppText style={s.marketingHeroFactText}>Nearby first</AppText>
+                </View>
+                <View style={s.marketingHeroFact}>
+                  <Ionicons
+                    name="shield-checkmark-outline"
+                    size={17}
+                    color={C.gold}
+                  />
+                  <AppText style={s.marketingHeroFactText}>
+                    Details confirmed together
+                  </AppText>
+                </View>
+              </View>
+            </View>
+
+            <View
+              style={[
+                s.marketingHeroImageFrame,
+                isWide && s.marketingHeroImageFrameWide,
+              ]}
+            >
+              <Image
+                source={require("./assets/grassroots-kickoff.png")}
+                style={s.marketingImage}
+                resizeMode="cover"
+                accessibilityLabel="Grassroots footballers playing on a community ground in Zimbabwe"
+              />
+              <View style={s.marketingImageCaption}>
+                <View style={s.authLiveDot} />
+                <AppText style={s.marketingImageCaptionText}>
+                  BUILT FOR THE GROUNDS WE ACTUALLY PLAY ON
+                </AppText>
+              </View>
+            </View>
+          </View>
+
+          <View style={s.marketingDecision}>
+            <View style={s.marketingDecisionHeading}>
+              <View style={{ flex: 1 }}>
+                <AppText style={s.marketingEyebrowDark}>
+                  START WITH A FEEL
+                </AppText>
+                <AppText style={s.marketingQuestion}>
+                  What brings you here?
+                </AppText>
+              </View>
+              {isWide ? (
+                <AppText style={s.marketingDecisionHint}>
+                  Choose one for now. You can add more roles later.
+                </AppText>
+              ) : null}
+            </View>
+            <View style={s.marketingRoleWrap}>
+              {ENTRY_ROLES.map(([itemRole, icon]) => {
+                const active = itemRole === role;
+                return (
+                  <Pressable
+                    key={itemRole}
+                    onPress={() => setRole(itemRole)}
+                    style={[
+                      s.marketingRoleChip,
+                      active && s.marketingRoleChipActive,
+                    ]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
+                  >
+                    <Ionicons
+                      name={icon}
+                      size={18}
+                      color={active ? C.white : C.redDark}
+                    />
+                    <AppText
+                      style={[
+                        s.marketingRoleChipText,
+                        active && s.marketingRoleChipTextActive,
+                      ]}
+                    >
+                      {itemRole}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {selectedRole ? (
+              <View style={s.marketingRolePreview}>
+                <Ionicons name="checkmark-circle" size={22} color={C.green} />
+                <View style={{ flex: 1 }}>
+                  <AppText style={s.marketingRolePreviewTitle}>
+                    {selectedRole.title}
+                  </AppText>
+                  <AppText style={s.marketingRolePreviewCopy}>
+                    {selectedRole.copy}
+                  </AppText>
+                </View>
+              </View>
+            ) : null}
+            <Pressable
+              disabled={!role}
+              style={[
+                s.marketingPrimaryButton,
+                !role && s.marketingPrimaryButtonDisabled,
+              ]}
+              onPress={() => onGuest(role)}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !role }}
+            >
+              <AppText style={s.marketingPrimaryButtonText}>
+                {role ? `Explore as ${role}` : "Choose a role to explore"}
+              </AppText>
+              <Ionicons name="football-outline" size={20} color={C.redDark} />
+            </Pressable>
+            <AppText style={s.marketingNoPressure}>
+              Explore first. Create an account only when you want to save or
+              connect.
+            </AppText>
+            <View style={s.marketingAccountRow}>
+              <Pressable onPress={onSignIn} style={s.marketingTextButton}>
+                <AppText style={s.marketingTextButtonLabel}>Sign in</AppText>
+              </Pressable>
+              <View style={s.marketingDivider} />
+              <Pressable onPress={onSignUp} style={s.marketingTextButton}>
+                <AppText style={s.marketingTextButtonLabel}>
+                  Create account
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={s.marketingSection}>
+            <AppText style={s.marketingEyebrow}>HOW GRASSROOTS WORKS</AppText>
+            <AppText style={s.marketingSectionTitle}>
+              From “who is free?” to kickoff.
+            </AppText>
+            <AppText style={s.marketingSectionIntro}>
+              One shared place for the decisions that normally disappear
+              across calls, groups and screenshots.
+            </AppText>
+            <View style={[s.marketingSteps, isWide && s.marketingStepsWide]}>
+              {WELCOME_STEPS.map((step) => (
+                <View key={step.number} style={s.marketingStepCard}>
+                  <View style={s.marketingStepTop}>
+                    <AppText style={s.marketingStepNumber}>
+                      {step.number}
+                    </AppText>
+                    <View style={s.marketingStepIcon}>
+                      <Ionicons name={step.icon} size={21} color={C.redDark} />
+                    </View>
+                  </View>
+                  <AppText style={s.marketingStepTitle}>{step.title}</AppText>
+                  <AppText style={s.marketingStepCopy}>{step.copy}</AppText>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={[s.marketingStory, isWide && s.marketingStoryWide]}>
+            <Image
+              source={require("./assets/grassroots-kickoff.png")}
+              style={[
+                s.marketingStoryImage,
+                isWide && s.marketingStoryImageWide,
+              ]}
+              resizeMode="cover"
+              accessibilityLabel="Two grassroots team organisers agreeing match details at a community ground"
+            />
+            <View style={s.marketingStoryCopy}>
+              <AppText style={s.marketingEyebrowDark}>
+                LESS GUESSING, MORE FOOTBALL
+              </AppText>
+              <AppText style={s.marketingStoryTitle}>
+                The agreement belongs to both teams.
+              </AppText>
+              <AppText style={s.marketingStoryText}>
+                Availability becomes the starting point. Both sides can see the
+                agreed ground, time, rules and costs. Match logistics open for
+                the people involved, and the final record waits for
+                confirmation.
+              </AppText>
+              <View style={s.marketingStoryPoints}>
+                {[
+                  "Location and availability before popularity",
+                  "Private team and match conversations",
+                  "Facts and history instead of a mystery score",
+                ].map((point) => (
+                  <View key={point} style={s.marketingStoryPoint}>
+                    <View style={s.marketingStoryDot} />
+                    <AppText style={s.marketingStoryPointText}>{point}</AppText>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          <View
+            style={[
+              s.marketingOpportunity,
+              isWide && s.marketingOpportunityWide,
+            ]}
+          >
+            <View style={s.marketingOpportunityCopy}>
+              <AppText style={s.marketingEyebrow}>ONE COMMUNITY</AppText>
+              <AppText style={s.marketingOpportunityTitle}>
+                A useful view for every role.
+              </AppText>
+              <AppText style={s.marketingOpportunityText}>
+                Players, coaches, referees, scouts and sponsors see the same
+                football from the view that matters to them. Shared profiles
+                reduce repeated work; permissions keep private work private.
+              </AppText>
+              <View style={s.marketingRoleList}>
+                {ENTRY_ROLES.map(([itemRole, icon]) => (
+                  <View key={itemRole} style={s.marketingRoleListItem}>
+                    <Ionicons name={icon} size={17} color={C.gold} />
+                    <AppText style={s.marketingRoleListText}>
+                      {itemRole}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <Image
+              source={require("./assets/grassroots-kickoff.png")}
+              style={[
+                s.marketingOpportunityImage,
+                isWide && s.marketingOpportunityImageWide,
+              ]}
+              resizeMode="cover"
+              accessibilityLabel="A footballer and referee talking beside a Zimbabwean community pitch"
+            />
+          </View>
+
+          <View style={s.marketingTrustPanel}>
+            <AppText style={s.marketingTrustTitle}>
+              Designed for real life here.
+            </AppText>
+            <View style={s.marketingTrustGrid}>
+              {[
+                ["phone-portrait-outline", "Small-screen first"],
+                ["speedometer-outline", "Careful with data"],
+                ["people-outline", "Community and guardian safety"],
+                ["document-text-outline", "Clear records, not rumours"],
+              ].map(([icon, label]) => (
+                <View key={label} style={s.marketingTrustItem}>
+                  <Ionicons name={icon} size={19} color={C.gold} />
+                  <AppText style={s.marketingTrustItemText}>{label}</AppText>
+                </View>
+              ))}
+            </View>
+            <AppText style={s.marketingResearchNote}>
+              Research-informed, locally grounded and made for grassroots
+              football rather than professional club systems.
+            </AppText>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
 function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
   const [mode, setMode] = useState(canClose ? "signup" : "welcome");
@@ -24365,7 +25191,34 @@ const s = StyleSheet.create({
     marginTop: -8,
     marginRight: -10,
   },
+  dropdownSearchWrap: {
+    minHeight: 50,
+    marginHorizontal: 12,
+    marginVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: "#F7F5F8",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  dropdownSearchInput: {
+    flex: 1,
+    minHeight: 48,
+    color: C.ink,
+    fontFamily: F.medium,
+    fontSize: 14,
+  },
   dropdownOptions: { flexGrow: 0 },
+  dropdownEmpty: {
+    minHeight: 110,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    padding: 20,
+  },
   dropdownOption: {
     minHeight: 52,
     paddingHorizontal: 16,
@@ -24384,6 +25237,31 @@ const s = StyleSheet.create({
   },
   dropdownOptionTextSelected: { color: C.redDark, fontFamily: F.bold },
   formHelp: { color: C.muted, fontSize: 9, lineHeight: 14, marginTop: 7 },
+  competitionCategoryCard: {
+    minHeight: 70,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: "#F3EEF8",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  categoryBadgeText: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    marginBottom: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "#EEE8F6",
+    color: C.redDark,
+    fontSize: 9,
+    fontFamily: F.bold,
+  },
   optionWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   formChoice: {
     minHeight: 40,
@@ -24592,6 +25470,73 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: C.ink,
+  },
+  teamColourPicker: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.white,
+    paddingVertical: 14,
+    overflow: "hidden",
+  },
+  teamColourSelection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+  },
+  teamColourPreview: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: C.ink,
+  },
+  teamColourName: { color: C.ink, fontSize: 16, fontFamily: F.black },
+  teamColourFamilies: { gap: 8, paddingHorizontal: 14, paddingBottom: 12 },
+  teamColourFamily: { width: 58, alignItems: "center", gap: 5 },
+  teamColourFamilyCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  teamColourFamilyCircleSelected: {
+    borderColor: C.ink,
+    transform: [{ scale: 1.06 }],
+  },
+  teamColourFamilyName: {
+    color: C.muted,
+    fontSize: 9,
+    fontFamily: F.medium,
+    textAlign: "center",
+  },
+  teamColourFamilyNameSelected: { color: C.ink, fontFamily: F.bold },
+  teamColourShades: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  teamColourShade: {
+    flex: 1,
+    minWidth: 40,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  teamColourShadeSelected: { borderWidth: 3, borderColor: C.ink },
+  locationListMessage: {
+    color: C.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 8,
   },
   liveLocationButton: {
     minHeight: 58,
@@ -25567,6 +26512,441 @@ const s = StyleSheet.create({
     lineHeight: 21,
   },
   authSafe: { flex: 1, backgroundColor: C.redDark },
+  marketingScreen: {
+    flexGrow: 1,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 30,
+    backgroundColor: C.redDark,
+  },
+  marketingInner: {
+    width: "100%",
+    maxWidth: 1180,
+    alignSelf: "center",
+  },
+  marketingHero: { marginTop: 24, gap: 18 },
+  marketingHeroWide: {
+    minHeight: 480,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 44,
+  },
+  marketingHeroCopy: { flex: 1 },
+  marketingHeroCopyWide: {
+    paddingVertical: 34,
+    paddingLeft: 18,
+  },
+  marketingTitle: {
+    maxWidth: 680,
+    color: C.white,
+    fontSize: 34,
+    lineHeight: 37,
+    fontFamily: F.black,
+    letterSpacing: -1.25,
+  },
+  marketingTitleWide: {
+    fontSize: 58,
+    lineHeight: 60,
+    letterSpacing: -2.1,
+  },
+  marketingIntro: {
+    maxWidth: 570,
+    color: "#E7DEEE",
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 13,
+  },
+  marketingHeroFacts: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    marginTop: 17,
+  },
+  marketingHeroFact: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  marketingHeroFactText: {
+    color: C.white,
+    fontSize: 12,
+    fontFamily: F.semibold,
+  },
+  marketingHeroImageFrame: {
+    height: 220,
+    overflow: "hidden",
+    borderRadius: 20,
+    backgroundColor: "#3B1554",
+    borderWidth: 1,
+    borderColor: "#67447C",
+  },
+  marketingHeroImageFrameWide: {
+    flex: 1.08,
+    height: 450,
+    borderRadius: 26,
+  },
+  marketingImage: { width: "100%", height: "100%" },
+  marketingImageCaption: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 19,
+    backgroundColor: "rgba(45,10,69,0.88)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  marketingImageCaptionText: {
+    flex: 1,
+    color: C.white,
+    fontSize: 9,
+    lineHeight: 12,
+    fontFamily: F.bold,
+    letterSpacing: 0.35,
+  },
+  marketingDecision: {
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: C.white,
+  },
+  marketingDecisionHeading: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 20,
+  },
+  marketingEyebrowDark: {
+    color: C.red,
+    fontSize: 10,
+    lineHeight: 14,
+    fontFamily: F.bold,
+    letterSpacing: 0.65,
+  },
+  marketingQuestion: {
+    color: C.ink,
+    fontSize: 23,
+    lineHeight: 27,
+    fontFamily: F.black,
+    letterSpacing: -0.45,
+    marginTop: 4,
+  },
+  marketingDecisionHint: {
+    maxWidth: 300,
+    color: C.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "right",
+  },
+  marketingRoleWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 16,
+  },
+  marketingRoleChip: {
+    minHeight: 44,
+    paddingHorizontal: 13,
+    borderRadius: 22,
+    backgroundColor: "#EEE8F6",
+    borderWidth: 1,
+    borderColor: "transparent",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  marketingRoleChipActive: {
+    backgroundColor: C.redDark,
+    borderColor: C.red,
+  },
+  marketingRoleChipText: {
+    color: C.redDark,
+    fontSize: 12,
+    fontFamily: F.semibold,
+  },
+  marketingRoleChipTextActive: { color: C.white },
+  marketingRolePreview: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 14,
+    padding: 13,
+    borderRadius: 12,
+    backgroundColor: "#F0F8F3",
+  },
+  marketingRolePreviewTitle: {
+    color: C.ink,
+    fontSize: 13,
+    lineHeight: 17,
+    fontFamily: F.bold,
+  },
+  marketingRolePreviewCopy: {
+    color: C.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  marketingPrimaryButton: {
+    minHeight: 54,
+    marginTop: 14,
+    borderRadius: 12,
+    paddingHorizontal: 17,
+    backgroundColor: C.gold,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+  },
+  marketingPrimaryButtonDisabled: { opacity: 0.48 },
+  marketingPrimaryButtonText: {
+    color: C.redDark,
+    fontSize: 15,
+    fontFamily: F.bold,
+  },
+  marketingNoPressure: {
+    color: C.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+    marginTop: 9,
+  },
+  marketingAccountRow: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  marketingTextButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 15,
+  },
+  marketingTextButtonLabel: {
+    color: C.redDark,
+    fontSize: 13,
+    fontFamily: F.bold,
+  },
+  marketingDivider: { width: 1, height: 18, backgroundColor: C.line },
+  marketingSection: { paddingVertical: 58 },
+  marketingEyebrow: {
+    color: C.gold,
+    fontSize: 10,
+    lineHeight: 14,
+    fontFamily: F.bold,
+    letterSpacing: 0.65,
+  },
+  marketingSectionTitle: {
+    maxWidth: 620,
+    color: C.white,
+    fontSize: 32,
+    lineHeight: 35,
+    fontFamily: F.black,
+    letterSpacing: -0.8,
+    marginTop: 7,
+  },
+  marketingSectionIntro: {
+    maxWidth: 620,
+    color: "#D7C8E6",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 10,
+  },
+  marketingSteps: { gap: 12, marginTop: 24 },
+  marketingStepsWide: { flexDirection: "row" },
+  marketingStepCard: {
+    flex: 1,
+    minHeight: 200,
+    padding: 18,
+    borderRadius: 16,
+    backgroundColor: "#3B1554",
+    borderWidth: 1,
+    borderColor: "#5A3371",
+  },
+  marketingStepTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  marketingStepNumber: {
+    color: "#8D6AA2",
+    fontSize: 28,
+    fontFamily: F.black,
+    fontVariant: ["tabular-nums"],
+  },
+  marketingStepIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: C.gold,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  marketingStepTitle: {
+    color: C.white,
+    fontSize: 18,
+    lineHeight: 22,
+    fontFamily: F.bold,
+    marginTop: 22,
+  },
+  marketingStepCopy: {
+    color: "#D7C8E6",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  marketingStory: {
+    overflow: "hidden",
+    borderRadius: 22,
+    backgroundColor: C.white,
+  },
+  marketingStoryWide: {
+    minHeight: 470,
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  marketingStoryImage: { width: "100%", height: 260 },
+  marketingStoryImageWide: { flex: 1.15, width: undefined, height: undefined },
+  marketingStoryCopy: {
+    flex: 1,
+    padding: 22,
+    justifyContent: "center",
+  },
+  marketingStoryTitle: {
+    color: C.ink,
+    fontSize: 28,
+    lineHeight: 31,
+    fontFamily: F.black,
+    letterSpacing: -0.65,
+    marginTop: 8,
+  },
+  marketingStoryText: {
+    color: C.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 13,
+  },
+  marketingStoryPoints: { gap: 10, marginTop: 20 },
+  marketingStoryPoint: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+  },
+  marketingStoryDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: C.green,
+    marginTop: 5,
+  },
+  marketingStoryPointText: {
+    flex: 1,
+    color: C.ink,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: F.semibold,
+  },
+  marketingOpportunity: {
+    marginTop: 22,
+    overflow: "hidden",
+    borderRadius: 22,
+    backgroundColor: "#3B1554",
+    borderWidth: 1,
+    borderColor: "#5A3371",
+  },
+  marketingOpportunityWide: {
+    minHeight: 440,
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  marketingOpportunityCopy: {
+    flex: 1,
+    padding: 22,
+    justifyContent: "center",
+  },
+  marketingOpportunityTitle: {
+    color: C.white,
+    fontSize: 28,
+    lineHeight: 31,
+    fontFamily: F.black,
+    letterSpacing: -0.65,
+    marginTop: 8,
+  },
+  marketingOpportunityText: {
+    color: "#D7C8E6",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 12,
+  },
+  marketingRoleList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 20,
+  },
+  marketingRoleListItem: {
+    minHeight: 36,
+    paddingHorizontal: 11,
+    borderRadius: 18,
+    backgroundColor: "#2D0A45",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  marketingRoleListText: {
+    color: C.white,
+    fontSize: 11,
+    fontFamily: F.semibold,
+  },
+  marketingOpportunityImage: { width: "100%", height: 260 },
+  marketingOpportunityImageWide: {
+    flex: 1.12,
+    width: undefined,
+    height: undefined,
+  },
+  marketingTrustPanel: {
+    marginTop: 22,
+    padding: 22,
+    borderRadius: 22,
+    backgroundColor: "#20102B",
+  },
+  marketingTrustTitle: {
+    color: C.white,
+    fontSize: 22,
+    lineHeight: 26,
+    fontFamily: F.black,
+  },
+  marketingTrustGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 18,
+  },
+  marketingTrustItem: {
+    flexGrow: 1,
+    flexBasis: 220,
+    minHeight: 46,
+    paddingHorizontal: 13,
+    borderRadius: 12,
+    backgroundColor: "#351944",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  marketingTrustItemText: {
+    color: C.white,
+    fontSize: 12,
+    fontFamily: F.semibold,
+  },
+  marketingResearchNote: {
+    maxWidth: 700,
+    color: "#A994B8",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 16,
+  },
   authWelcome: {
     flexGrow: 1,
     paddingHorizontal: 20,
@@ -26113,6 +27493,31 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 34,
+  },
+  adaptiveAreaCard: {
+    minHeight: 78,
+    marginTop: 14,
+    padding: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: "#F3EEF8",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+  searchPolicyCard: {
+    minHeight: 76,
+    marginTop: 14,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.white,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   friendlyResult: {
     paddingVertical: 16,

@@ -158,8 +158,150 @@ export function leagueConflictGuard(team, league) {
   };
 }
 
+const resultValue = (result) => {
+  if (typeof result === "number") return Math.max(-1, Math.min(1, result));
+  if (["win", "won", "w"].includes(String(result).toLowerCase())) return 1;
+  if (["loss", "lost", "l"].includes(String(result).toLowerCase())) return -1;
+  return 0;
+};
+
+const formProfile = (team) => {
+  const results = (team.recentResults || []).slice(0, 8).map(resultValue);
+  const played = Math.max(Number(team.matchesPlayed || 0), results.length);
+  const wins = results.filter((value) => value > 0).length;
+  const losses = results.filter((value) => value < 0).length;
+  return {
+    played,
+    sample: results.length,
+    winRate: results.length ? wins / results.length : 0,
+    lossRate: results.length ? losses / results.length : 0,
+    momentum: results.length
+      ? results.reduce((total, value, index) => total + value * (8 - index), 0) /
+        results.reduce((total, _value, index) => total + (8 - index), 0)
+      : 0,
+  };
+};
+
+const stableFraction = (value) => {
+  let hash = 2166136261;
+  for (let index = 0; index < String(value).length; index += 1) {
+    hash ^= String(value).charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+};
+
+const isLocalOpponent = (team, opponent) =>
+  Number.isFinite(opponent.distanceKm)
+    ? opponent.distanceKm <= 10
+    : locationCompatibility(team, opponent) >= 0.75;
+
+export function adaptiveSearchPolicy(team, candidates) {
+  const form = formProfile(team);
+  const suitableLocal = candidates.filter(
+    (opponent) =>
+      isLocalOpponent(team, opponent) && competitiveFit(team, opponent) >= 0.55,
+  );
+  const recentlyPlayedLocal = suitableLocal.filter((opponent) =>
+    (opponent.historyWithTeam || []).some(
+      (meeting) => Number(meeting.daysAgo ?? Infinity) <= 120,
+    ),
+  );
+  const exhaustion = suitableLocal.length
+    ? recentlyPlayedLocal.length / suitableLocal.length
+    : form.played >= 3
+      ? 1
+      : 0;
+  const onboarding = form.played < 5;
+  const strong = !onboarding && form.sample >= 4 && form.winRate >= 0.6;
+  const struggling = !onboarding && form.sample >= 4 && form.lossRate >= 0.55;
+  const localExhausted = exhaustion >= 0.7;
+  const radiusKm = onboarding
+    ? 10
+    : strong && localExhausted
+      ? 50
+      : strong || localExhausted
+        ? 25
+        : struggling
+          ? 15
+          : 10;
+  return {
+    radiusKm,
+    onboarding,
+    strong,
+    struggling,
+    localExhausted,
+    localPoolSize: suitableLocal.length,
+    recentlyPlayedLocal: recentlyPlayedLocal.length,
+    outsideShare: struggling
+      ? 0.125
+      : strong
+        ? 0.35
+        : localExhausted
+          ? 0.2
+          : 0,
+  };
+}
+
+const momentumFit = (team, opponent) => {
+  const teamForm = formProfile(team);
+  const opponentForm = formProfile(opponent);
+  const adjustedTeamRating =
+    Number(team.rating || 1000) + teamForm.momentum * 120;
+  const adjustedOpponentRating =
+    Number(opponent.rating || 1000) + opponentForm.momentum * 120;
+  return clamp01(1 - Math.abs(adjustedTeamRating - adjustedOpponentRating) / 550);
+};
+
+const gravityFit = (team, opponent) => {
+  const qualityProduct =
+    (Math.max(500, Number(team.rating || 1000)) / 1200) *
+    (Math.max(500, Number(opponent.rating || 1000)) / 1200);
+  const distance = Math.max(1, Number(opponent.distanceKm || 8));
+  return clamp01(qualityProduct / (1 + (distance / 10) ** 2));
+};
+
+const consentFit = (team, opponent, slot) => {
+  const teamRate = Number(team.acceptRateBySlot?.[slot] ?? team.acceptRate ?? 0.6);
+  const opponentRate = Number(
+    opponent.acceptRateBySlot?.[slot] ?? opponent.acceptRate ?? 0.6,
+  );
+  return clamp01(Math.sqrt(teamRate * opponentRate));
+};
+
+const declineDecay = (opponent) => {
+  const recentDeclines = (opponent.declinesWithTeam || []).filter(
+    (decline) => Number(decline.daysAgo ?? Infinity) <= 90,
+  ).length;
+  return Math.pow(0.28, Math.min(3, recentDeclines));
+};
+
+const onboardingFit = (team, opponent) => {
+  const first = formProfile(team).played < 5;
+  const second = formProfile(opponent).played < 5;
+  if (!first) return 1;
+  return second ? 1 : 0;
+};
+
+const slotFit = (opponent, slot) =>
+  clamp01(Number(opponent.acceptRateBySlot?.[slot] ?? 0.6));
+
+const sharedTrustFit = (opponent) =>
+  clamp01(Number(opponent.sharedTrustedConnections || 0) / 3);
+
+const rescheduleFit = (team, opponent) =>
+  clamp01(
+    1 -
+      Math.abs(
+        Number(team.rescheduleFlexibility ?? 0.65) -
+          Number(opponent.rescheduleFlexibility ?? 0.65),
+      ),
+  );
+
 export function rankOpponentCandidates(team, candidates, context) {
-  return candidates
+  const policy = adaptiveSearchPolicy(team, candidates);
+  const limit = Math.max(1, Number(context.resultLimit || 8));
+  const ranked = candidates
     .map((opponent) => {
       const proposedSide =
         context.proposedSide.homeTeamId === "__opponent__"
@@ -190,23 +332,87 @@ export function rankOpponentCandidates(team, candidates, context) {
         ),
         rivalry: rivalryAndVariety(opponent.historyWithTeam || []),
         age: ageCompatibility(team, opponent),
+        gravity: gravityFit(team, opponent),
+        consent: consentFit(team, opponent, context.slot),
+        pod: clamp01(
+          1 - Math.abs(Number(team.rating || 1000) - Number(opponent.rating || 1000)) / 350,
+        ),
+        momentum: momentumFit(team, opponent),
+        onboarding: onboardingFit(team, opponent),
+        goldenHour: slotFit(opponent, context.slot),
+        sharedTrust: sharedTrustFit(opponent),
+        reschedule: rescheduleFit(team, opponent),
+        decline: declineDecay(opponent),
       };
+      const local = isLocalOpponent(team, opponent);
+      const wildcard =
+        !policy.onboarding &&
+        stableFraction(`${team.id}:${opponent.id}:${context.slot}`) < 0.1;
+      const withinRadius =
+        local ||
+        !Number.isFinite(opponent.distanceKm) ||
+        opponent.distanceKm <= policy.radiusKm;
+      const growthOpponent =
+        Number(opponent.rating || 1000) > Number(team.rating || 1000) &&
+        Number(opponent.rating || 1000) - Number(team.rating || 1000) <= 250;
       const score =
-        scores.location * 0.45 +
-        scores.travel * 0.15 +
+        scores.location * 0.2 +
+        scores.gravity * 0.12 +
         scores.availability * 0.12 +
-        scores.competitive * 0.1 +
-        scores.homeAway * 0.14 +
-        scores.reliability * 0.05 +
-        scores.cost * 0.03 +
+        scores.competitive * 0.12 +
+        scores.homeAway * 0.08 +
+        scores.reliability * 0.07 +
+        scores.travel * 0.07 +
+        scores.consent * 0.06 +
+        scores.pod * 0.05 +
+        scores.momentum * 0.04 +
+        scores.goldenHour * 0.03 +
+        scores.onboarding * 0.03 +
+        scores.sharedTrust * 0.02 +
+        scores.reschedule * 0.02 +
+        scores.cost * 0.02 +
         scores.rivalry * 0.02 +
-        scores.age * 0.02;
-      return { opponent, score, signals: scores };
+        scores.age * 0.03;
+      return {
+        opponent,
+        score: score * scores.decline,
+        signals: {
+          ...scores,
+          local,
+          wildcard,
+          withinRadius,
+          growthOpponent,
+          searchRadiusKm: policy.radiusKm,
+        },
+      };
     })
     .filter(
       (item) =>
         item.signals.age > 0 &&
-        item.signals.location >= 0.75,
+        item.signals.onboarding > 0 &&
+        item.signals.decline >= 0.1 &&
+        (item.signals.withinRadius || item.signals.wildcard),
     )
     .sort((a, b) => b.score - a.score);
+
+  const local = ranked.filter((item) => item.signals.local);
+  const outside = ranked.filter((item) => !item.signals.local);
+  let outsideLimit = Math.floor(limit * policy.outsideShare);
+  if (policy.struggling && outside.length) outsideLimit = 1;
+  if (!outsideLimit && outside.some((item) => item.signals.wildcard))
+    outsideLimit = 1;
+  outsideLimit = Math.min(outsideLimit, outside.length, limit);
+  const selected = local.slice(0, Math.max(0, limit - outsideLimit));
+  const outsideSelected = outside
+    .sort(
+      (first, second) =>
+        Number(second.signals.growthOpponent) -
+          Number(first.signals.growthOpponent) || second.score - first.score,
+    )
+    .slice(0, outsideLimit);
+  const insertionPoint = policy.struggling
+    ? Math.min(5, selected.length)
+    : Math.min(3, selected.length);
+  selected.splice(insertionPoint, 0, ...outsideSelected);
+  return selected.slice(0, limit).map((item) => ({ ...item, policy }));
 }

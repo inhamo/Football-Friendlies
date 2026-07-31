@@ -55,6 +55,8 @@ const requireFirebase = () => {
 const records = (snapshot) =>
   snapshot.docs.map((item) => ({ ...item.data(), id: item.id }));
 const unique = (values) => [...new Set(values.filter(Boolean))];
+const footballCategory = (record = {}) =>
+  record.teamCategory || record.competitionCategory || "Mixed/Open";
 const stableHash = (value) => {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -613,6 +615,10 @@ export async function joinLeagueRecord(league, team, actorId) {
     if (!leagueSnapshot.exists())
       throw new Error("This competition is no longer available.");
     const storedLeague = leagueSnapshot.data();
+    if (footballCategory(storedLeague) !== footballCategory(team))
+      throw new Error(
+        `This is a ${footballCategory(storedLeague)} competition. Switch to a matching team to join.`,
+      );
     const joinedTeamIds = unique(storedLeague.teamIds || []);
     if (
       !joinedTeamIds.includes(team.id) &&
@@ -1787,6 +1793,10 @@ export async function createTeamChallenge(
   terms,
 ) {
   requireFirebase();
+  if (footballCategory(senderTeam) !== footballCategory(recipientTeam))
+    throw new Error(
+      "Choose a team in the same football category for this friendly.",
+    );
   const all = await loadTeamChallenges(ownerId);
   const existing = all.find(
     (item) =>
