@@ -22,7 +22,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Asset } from "expo-asset";
 import { useFonts } from "expo-font";
-import AppIcon, { APP_ICON_ASSETS } from "./components/AppIcon";
+import AppIcon from "./components/AppIcon";
 import AsyncStorage from "./services/storage";
 import * as ImagePicker from "expo-image-picker";
 import * as Clipboard from "expo-clipboard";
@@ -279,14 +279,21 @@ function usePersistentState(key, initialValue) {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     let active = true;
+    const hydrationFallback = setTimeout(() => {
+      if (active) setHydrated(true);
+    }, 2500);
     AsyncStorage.getItem(key)
       .then((saved) => {
         if (active && saved) setValue(JSON.parse(saved));
       })
       .catch(() => {})
-      .finally(() => active && setHydrated(true));
+      .finally(() => {
+        clearTimeout(hydrationFallback);
+        if (active) setHydrated(true);
+      });
     return () => {
       active = false;
+      clearTimeout(hydrationFallback);
     };
   }, [key]);
   useEffect(() => {
@@ -20201,7 +20208,8 @@ function App() {
   const mutationFlights = useRef(new Map());
   const [sharedLeagueId, setSharedLeagueId] = useState(null);
   const [ready, setReady] = useState(false);
-  const [fontsLoaded] = useFonts({
+  const [startupTimedOut, setStartupTimedOut] = useState(false);
+  const [fontsLoaded, fontError] = useFonts({
     Archivo_400Regular,
     Archivo_500Medium,
     Archivo_600SemiBold,
@@ -20209,6 +20217,10 @@ function App() {
     Archivo_800ExtraBold,
     Archivo_900Black,
   });
+  useEffect(() => {
+    const startupFallback = setTimeout(() => setStartupTimedOut(true), 5000);
+    return () => clearTimeout(startupFallback);
+  }, []);
   useEffect(() => {
     const handleLeagueLink = (url) => {
       const match = url?.match(/[?&]league=([^&]+)/);
@@ -20242,26 +20254,38 @@ function App() {
     ).catch(() => {});
   }, []);
   useEffect(() => {
-    const assets = [
-      require("./assets/grassroots-kickoff.png"),
-      ...APP_ICON_ASSETS,
-      ...Object.values(clubLogos),
-      require("./assets/dynamos-match.jpg"),
-      ...signingNews.map((n) => n.image),
-    ];
-    Promise.all([
-      Asset.loadAsync(assets),
-      new Promise((r) => setTimeout(r, 900)),
-    ]).finally(() => setReady(true));
+    let active = true;
+    const assetFallback = setTimeout(() => {
+      if (active) setReady(true);
+    }, 3500);
+    Promise.allSettled([
+      Asset.loadAsync([require("./assets/grassroots-kickoff.png")]),
+      new Promise((resolve) => setTimeout(resolve, 900)),
+    ]).finally(() => {
+      clearTimeout(assetFallback);
+      if (active) setReady(true);
+    });
+    return () => {
+      active = false;
+      clearTimeout(assetFallback);
+    };
   }, []);
   useEffect(() => {
     let active = true;
+    const authFallback = setTimeout(() => {
+      if (active)
+        setAuthSession((current) =>
+          current === undefined ? null : current,
+        );
+    }, 4000);
     initializeDatabase()
       .then(getCurrentSession)
       .then((session) => active && setAuthSession(session))
-      .catch(() => active && setAuthSession(null));
+      .catch(() => active && setAuthSession(null))
+      .finally(() => clearTimeout(authFallback));
     return () => {
       active = false;
+      clearTimeout(authFallback);
     };
   }, []);
   useEffect(() => {
@@ -20668,12 +20692,12 @@ function App() {
     setUserRole("Player");
   }, [setRoleData, setUserRole, userRole]);
   if (
-    !ready ||
-    !fontsLoaded ||
-    !roleHydrated ||
-    !dataHydrated ||
-    !teamHydrated ||
-    authSession === undefined
+    (!ready && !startupTimedOut) ||
+    (!fontsLoaded && !fontError && !startupTimedOut) ||
+    (!roleHydrated && !startupTimedOut) ||
+    (!dataHydrated && !startupTimedOut) ||
+    (!teamHydrated && !startupTimedOut) ||
+    (authSession === undefined && !startupTimedOut)
   )
     return <AppLoader />;
   if (userRole === "Guest Player") return <AppLoader />;
