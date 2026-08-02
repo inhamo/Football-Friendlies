@@ -3953,6 +3953,8 @@ function CommunityHome({
               <Pressable
                 style={s.communitySecondaryAction}
                 onPress={onOpenTeam}
+                accessibilityRole="button"
+                accessibilityLabel="Create your team"
               >
                 <Ionicons name="add" color="white" size={18} />
                 <AppText style={s.communitySecondaryActionText}>
@@ -8834,6 +8836,7 @@ function Community({
   statsOnly = false,
   close,
   startFinder = false,
+  startCreatingTeam = false,
   onFinderOpened,
   team,
   onCreateTeam,
@@ -8850,7 +8853,9 @@ function Community({
   const [record, setRecord] = useState(false);
   const [finder, setFinder] = useState(false);
   const [challengeTeam, setChallengeTeam] = useState(null);
-  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [creatingTeam, setCreatingTeam] = useState(
+    () => Boolean(startCreatingTeam && !team),
+  );
   const [postingAvailability, setPostingAvailability] = useState(false);
   const [rankingTeam, setRankingTeam] = useState(null);
   const [rankingFilter, setRankingFilter] = useState("Overall");
@@ -9035,6 +9040,9 @@ function Community({
       onFinderOpened?.();
     }
   }, [startFinder, onFinderOpened]);
+  useEffect(() => {
+    if (startCreatingTeam && !team) setCreatingTeam(true);
+  }, [startCreatingTeam, team]);
   useEffect(() => {
     if (team?.id) setCategoryFilter(footballCategory(team));
   }, [team?.id, team?.teamCategory]);
@@ -22710,6 +22718,7 @@ function App() {
           Teams: (
             <Community
               startFinder={teamFinderRequested}
+              startCreatingTeam={!activeTeam}
               onFinderOpened={() => setTeamFinderRequested(false)}
               team={activeTeam}
               onCreateTeam={createTeam}
