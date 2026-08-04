@@ -18,7 +18,9 @@
     "firebase:deploy:free": "firebase deploy --only firestore",
     "firebase:emulators": "firebase emulators:start",
     "test:e2e": "playwright test",
-    "test:e2e:dual": "playwright test tests/e2e/dual-user.spec.mjs"
+    "test:e2e:dual": "playwright test tests/e2e/dual-user.spec.mjs",
+    "deploy": "npm run build:web && wrangler deploy",
+    "preview": "npm run build:web && wrangler dev"
   },
   "dependencies": {
     "@expo-google-fonts/archivo": "^0.4.2",
@@ -51,7 +53,8 @@
     "@playwright/test": "^1.62.0",
     "@types/react": "~19.1.0",
     "firebase-tools": "^15.24.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "wrangler": "^4.114.0"
   },
   "private": true
 }
