@@ -20,9 +20,9 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Asset } from "expo-asset";
 import { useFonts } from "expo-font";
-import AppIcon from "./components/AppIcon";
 import AsyncStorage from "./services/storage";
 import * as ImagePicker from "expo-image-picker";
 import * as Clipboard from "expo-clipboard";
@@ -155,6 +155,10 @@ const C = {
   line: "#DED8E6",
   green: "#168A53",
   gold: "#B9F34A",
+  shell: "#120819",
+  shellRaised: "#24122D",
+  shellLine: "#35213F",
+  shellMuted: "#9F91A8",
 };
 const F = {
   regular: "Archivo_400Regular",
@@ -169,20 +173,330 @@ function AppText({ style, ...props }) {
   return <Text {...props} style={[{ fontFamily: F.regular }, style]} />;
 }
 
-function Ionicons({ name, ...props }) {
-  return <AppIcon {...props} name={name} />;
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function useReducedMotionPreference() {
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => mounted && setReducedMotion(enabled))
+      .catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener?.(
+      "reduceMotionChanged",
+      setReducedMotion,
+    );
+    return () => {
+      mounted = false;
+      subscription?.remove?.();
+    };
+  }, []);
+  return reducedMotion;
 }
 
-function Icons8Credit() {
+function MotionPressable({ style, onPressIn, onPressOut, children, ...props }) {
+  const reducedMotion = useReducedMotionPreference();
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const settle = (toValue, duration) => {
+    if (reducedMotion) {
+      pressScale.setValue(1);
+      return;
+    }
+    Animated.timing(pressScale, {
+      toValue,
+      duration,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  };
   return (
-    <Pressable
-      onPress={() => Linking.openURL("https://icons8.com")}
-      accessibilityRole="link"
-      accessibilityLabel="Icons provided by Icons8"
-      style={s.icons8Credit}
+    <AnimatedPressable
+      {...props}
+      onPressIn={(event) => {
+        settle(0.97, 110);
+        onPressIn?.(event);
+      }}
+      onPressOut={(event) => {
+        settle(1, 150);
+        onPressOut?.(event);
+      }}
+      style={[style, { transform: [{ scale: pressScale }] }]}
     >
-      <AppText style={s.icons8CreditText}>Icons by Icons8</AppText>
-    </Pressable>
+      {children}
+    </AnimatedPressable>
+  );
+}
+
+const LEGAL_EFFECTIVE_DATE = "8 August 2026";
+
+const TERMS_SECTIONS = [
+  {
+    title: "Using Grassroots",
+    body: [
+      "These Terms govern your use of the Grassroots website and app. By creating an account, exploring as a guest or using a team feature, you agree to these Terms.",
+      "Grassroots is a community football platform. It helps people discover teams, arrange matches, communicate, record agreed results and build football profiles. It is not a football association, club, scout, sponsor, referee or emergency service.",
+    ],
+  },
+  {
+    title: "Accounts and eligibility",
+    body: [
+      "Give accurate information, keep your password private and use only accounts or team roles you are authorised to manage. You are responsible for activity performed through your account.",
+      "A person under 18 may only have personal information submitted to Grassroots with the written consent and appropriate involvement of a parent or legal guardian. Adults must not use the platform to bypass a club's safeguarding rules.",
+    ],
+  },
+  {
+    title: "Matches are community agreements",
+    body: [
+      "Teams are responsible for checking opponents, venues, kick-off times, player eligibility, costs, transport, equipment, officials and local rules before playing.",
+      "A challenge, fixture, ranking or profile is not a guarantee of safety, quality, availability or playing ability. Results and records may depend on confirmation by the people involved.",
+    ],
+  },
+  {
+    title: "Acceptable conduct",
+    body: [
+      "Do not impersonate people or teams, publish false results, threaten or harass others, exploit children, arrange unlawful activity, upload content without permission, interfere with the service or use football information for betting manipulation or fraud.",
+      "Report serious concerns through the available reporting tools. If someone is in immediate danger, contact trusted local help or the appropriate authorities directly.",
+    ],
+  },
+  {
+    title: "Your content",
+    body: [
+      "You keep ownership of content you submit. You give Grassroots a limited permission to store, process and display that content only as needed to operate, secure and improve the service and to show information to the audiences you select.",
+      "You must have permission to share team badges, photographs, video, match information and personal details. Do not post a child's image or personal information without the required guardian consent.",
+    ],
+  },
+  {
+    title: "Availability and enforcement",
+    body: [
+      "The service may change, pause or contain errors, especially while features are being tested. We may restrict or remove accounts, content or access where reasonably necessary for safety, security, legal compliance or serious breaches of these Terms.",
+      "To the extent permitted by Zimbabwean law, Grassroots is provided without a guarantee that every match, opportunity, profile or connection will be successful. Nothing in these Terms excludes rights or liability that cannot lawfully be excluded.",
+    ],
+  },
+  {
+    title: "Law and changes",
+    body: [
+      "These Terms are governed by the laws of Zimbabwe. We may update them when the service or legal requirements change. The effective date above will change when a new version is published.",
+      "Questions about these Terms can be raised through the support or safeguarding channels available in Grassroots.",
+    ],
+  },
+];
+
+const PRIVACY_SECTIONS = [
+  {
+    title: "Our privacy commitment",
+    body: [
+      "Grassroots processes personal information to run a community football platform in Zimbabwe. This policy explains what we collect, why we use it and the choices available to you.",
+      "We aim to follow Zimbabwe's Cyber and Data Protection Act [Chapter 12:07] and applicable guidance from the Data Protection Authority.",
+    ],
+  },
+  {
+    title: "Information we collect",
+    body: [
+      "Account information may include your name, phone number or email address, authentication details and selected football roles.",
+      "Football information may include a team, position, age group, availability, area, venue, fixtures, results, statistics, photographs, video, referee information and profile details you choose to provide.",
+      "Service information may include messages, reports, confirmations, device or browser information, approximate usage events and information stored on your device. Precise device location is requested only when a feature needs it and your device grants permission.",
+    ],
+  },
+  {
+    title: "How we use information",
+    body: [
+      "We use information to create accounts, match nearby teams, organise fixtures, support football profiles, enable permitted conversations, confirm community records, prevent abuse, investigate reports, protect the service and meet legal obligations.",
+      "We do not sell personal information. We do not use private conversations or precise location for advertising.",
+    ],
+  },
+  {
+    title: "Who can see information",
+    body: [
+      "Public football profiles and team pages may be visible to other users or visitors. Match details are shared with relevant participants. Private contact details, guardian details, safety reports and restricted conversations are not intended for public display.",
+      "Information may be processed by trusted hosting, database, authentication and security providers working for the service. We may disclose information where required by law or reasonably necessary to protect a person from serious harm.",
+    ],
+  },
+  {
+    title: "Children and young players",
+    body: [
+      "In Zimbabwe, a child is a person under 18. Do not submit a child's personal information unless a parent or legal guardian has given written consent and remains appropriately involved.",
+      "Children's profiles should use the minimum information needed for football. Exact birth dates, home addresses, private guardian contacts and private conversations must remain restricted. Safeguarding concerns take priority over discovery or promotion.",
+    ],
+  },
+  {
+    title: "Storage, security and retention",
+    body: [
+      "We use reasonable technical and organisational safeguards, but no online system is completely secure. Keep your password private and report suspected account misuse.",
+      "We keep information only for as long as needed for the purpose described, safety and dispute records, legal obligations or a legitimate community record. Some information may remain in backups for a limited period after deletion.",
+    ],
+  },
+  {
+    title: "Your choices and rights",
+    body: [
+      "You may ask to access, correct or delete personal information, object to certain processing, withdraw consent where consent is the basis, or ask how information has been used. A guardian may exercise these rights for a child.",
+      "Some public details and permissions can be changed inside the app. Other privacy requests can be raised through the support or safeguarding channels available in Grassroots. We may need to verify your identity before completing a request.",
+    ],
+  },
+  {
+    title: "Transfers and policy changes",
+    body: [
+      "Service providers may process information outside Zimbabwe. Where this happens, we use reasonable contractual and technical safeguards appropriate to the information and applicable law.",
+      "We may update this policy when features, providers or legal requirements change. The effective date above will show when the current version took effect.",
+    ],
+  },
+];
+
+const publicRouteFromUrl = (url) => {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    let path = parsed.pathname || "";
+    if ((!path || path === "/") && !["http:", "https:"].includes(parsed.protocol))
+      path = parsed.hostname || "";
+    path = `/${path}`.replace(/\/+/g, "/").replace(/^\/--\//, "/");
+    const normalised = path.replace(/\/$/, "").toLowerCase() || "/";
+    if (["/", "/index.html"].includes(normalised)) return null;
+    if (["/terms", "/terms-and-conditions", "/terms-and-conditions.html"].includes(normalised))
+      return "terms";
+    if (["/privacy", "/privacy-policy", "/privacy-policy.html"].includes(normalised))
+      return "privacy";
+    return "not-found";
+  } catch {
+    return null;
+  }
+};
+
+function LegalLinks({ onOpen, light = false }) {
+  return (
+    <View style={s.legalLinks}>
+      <Pressable
+        onPress={() => onOpen("terms")}
+        accessibilityRole="link"
+        accessibilityLabel="Open Terms and Conditions"
+      >
+        <AppText style={[s.legalLinkText, light && s.legalLinkTextLight]}>
+          Terms & Conditions
+        </AppText>
+      </Pressable>
+      <View style={[s.legalLinkDot, light && s.legalLinkDotLight]} />
+      <Pressable
+        onPress={() => onOpen("privacy")}
+        accessibilityRole="link"
+        accessibilityLabel="Open Privacy Policy"
+      >
+        <AppText style={[s.legalLinkText, light && s.legalLinkTextLight]}>
+          Privacy Policy
+        </AppText>
+      </Pressable>
+    </View>
+  );
+}
+
+function LegalPage({ kind, onClose, onSwitch }) {
+  const privacy = kind === "privacy";
+  const sections = privacy ? PRIVACY_SECTIONS : TERMS_SECTIONS;
+  const title = privacy ? "Privacy Policy" : "Terms & Conditions";
+  return (
+    <SafeAreaView style={s.legalSafe}>
+      <StatusBar barStyle="dark-content" />
+      <View style={s.legalHeader}>
+        <Pressable
+          onPress={onClose}
+          style={s.legalBackButton}
+          accessibilityRole="button"
+          accessibilityLabel="Return to Grassroots"
+        >
+          <Ionicons name="arrow-back" size={22} color={C.ink} />
+        </Pressable>
+        <View style={s.friendliesMark}>
+          <AppText style={s.friendliesMarkText}>F</AppText>
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppText style={s.headerTitle}>GRASSROOTS</AppText>
+          <AppText style={s.headerSub}>OUR FOOTBALL · OUR RESPONSIBILITY</AppText>
+        </View>
+      </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.legalContent}
+      >
+        <View style={s.legalIntro}>
+          <View style={s.legalIcon}>
+            <Ionicons
+              name={privacy ? "lock-closed-outline" : "document-text-outline"}
+              size={25}
+              color={C.gold}
+            />
+          </View>
+          <AppText style={s.legalTitle}>{title}</AppText>
+          <AppText style={s.legalUpdated}>Effective {LEGAL_EFFECTIVE_DATE}</AppText>
+          <AppText style={s.legalSummary}>
+            {privacy
+              ? "How Grassroots handles information while helping football communities find and organise one another."
+              : "The practical rules that keep Grassroots useful, fair and safe for the football community."}
+          </AppText>
+        </View>
+        <View style={s.legalDocument}>
+          {sections.map((section, index) => (
+            <View key={section.title} style={s.legalSection}>
+              <View style={s.legalSectionNumber}>
+                <AppText style={s.legalSectionNumberText}>{index + 1}</AppText>
+              </View>
+              <View style={s.legalSectionBody}>
+                <AppText style={s.legalSectionTitle}>{section.title}</AppText>
+                {section.body.map((paragraph) => (
+                  <AppText key={paragraph} style={s.legalParagraph}>
+                    {paragraph}
+                  </AppText>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+        <View style={s.legalSwitchPanel}>
+          <AppText style={s.legalSwitchTitle}>
+            {privacy ? "Also read the platform rules" : "See how information is handled"}
+          </AppText>
+          <Pressable
+            onPress={() => onSwitch(privacy ? "terms" : "privacy")}
+            style={s.legalSwitchButton}
+            accessibilityRole="link"
+          >
+            <AppText style={s.legalSwitchButtonText}>
+              {privacy ? "Terms & Conditions" : "Privacy Policy"}
+            </AppText>
+            <Ionicons name="arrow-forward" size={18} color={C.redDark} />
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function NotFoundPage({ onHome, onOpenLegal }) {
+  return (
+    <SafeAreaView style={s.notFoundSafe}>
+      <StatusBar barStyle="light-content" />
+      <View style={s.notFoundPitch}>
+        <View style={s.notFoundHalfwayLine} />
+        <View style={s.notFoundCircle} />
+        <View style={s.notFoundBall}>
+          <Ionicons name="football-outline" size={32} color={C.redDark} />
+        </View>
+      </View>
+      <View style={s.notFoundContent}>
+        <View style={s.notFoundCodeRow}>
+          <AppText style={s.notFoundCode}>4</AppText>
+          <View style={s.notFoundZero}>
+            <Ionicons name="football-outline" size={47} color={C.gold} />
+          </View>
+          <AppText style={s.notFoundCode}>4</AppText>
+        </View>
+        <AppText style={s.notFoundTitle}>This page has gone offside.</AppText>
+        <AppText style={s.notFoundCopy}>
+          The link may be old, incomplete or pointing to a page that has moved.
+        </AppText>
+        <Pressable onPress={onHome} style={s.notFoundButton}>
+          <AppText style={s.notFoundButtonText}>Back to Grassroots</AppText>
+          <Ionicons name="arrow-forward" size={20} color={C.redDark} />
+        </Pressable>
+        <LegalLinks onOpen={onOpenLegal} light />
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -1272,11 +1586,14 @@ function BrandHeader({
         <AppText style={s.friendliesMarkText}>F</AppText>
       </View>
       <View style={{ flex: 1 }}>
-        <AppText style={s.headerTitle}>{title}</AppText>
-        <AppText style={s.headerSub}>GRASSROOTS FOOTBALL · ZIMBABWE</AppText>
+        <AppText style={s.brandHeaderTitle}>{title}</AppText>
+        <AppText style={s.brandHeaderSub}>GRASSROOTS FOOTBALL · ZIMBABWE</AppText>
       </View>
-      <Ionicons name="search" size={22} />
-      <Pressable
+      <View style={s.headerNetworkState}>
+        <View style={s.headerNetworkDot} />
+        <AppText style={s.headerNetworkText}>LIVE</AppText>
+      </View>
+      <MotionPressable
         onPress={onNotifications}
         disabled={!onNotifications}
         style={s.headerBell}
@@ -1287,7 +1604,7 @@ function BrandHeader({
             : "Notifications"
         }
       >
-        <Ionicons name="notifications-outline" size={22} color={C.ink} />
+        <Ionicons name="notifications-outline" size={22} color={C.white} />
         {notificationCount ? (
           <View style={s.headerBellBadge}>
             <AppText style={s.headerBellBadgeText}>
@@ -1295,7 +1612,7 @@ function BrandHeader({
             </AppText>
           </View>
         ) : null}
-      </Pressable>
+      </MotionPressable>
     </View>
   );
 }
@@ -3869,8 +4186,22 @@ function CommunityHome({
   const [posting, setPosting] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const { width } = useWindowDimensions();
+  const reducedMotion = useReducedMotionPreference();
+  const networkSignal = useRef(new Animated.Value(1)).current;
   const narrowMatches = width < 360;
   const hasTeam = Boolean(team);
+  useEffect(() => {
+    if (reducedMotion) {
+      networkSignal.setValue(1);
+      return;
+    }
+    networkSignal.setValue(0.08);
+    Animated.timing(networkSignal, {
+      toValue: 1,
+      duration: 240,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  }, [networkSignal, reducedMotion]);
   if (posting)
     return (
       <PostAvailabilityFlow
@@ -3900,6 +4231,13 @@ function CommunityHome({
           onNotifications={() => setShowNotifications(true)}
         />
         <View style={s.communityWelcome}>
+          <Image
+            source={require("./assets/grassroots-network-hero.jpg")}
+            style={s.communityWelcomeImage}
+            resizeMode="cover"
+            accessible={false}
+          />
+          <View style={s.communityWelcomeShade} />
           <View style={s.communityWelcomeTop}>
             <View style={s.homeTeamBadge}>
               {hasTeam ? (
@@ -3918,19 +4256,47 @@ function CommunityHome({
                 {hasTeam ? team.area : "Your football space is ready"}
               </AppText>
             </View>
+            <View style={s.readyPill}>
+              <View style={s.readyDot} />
+              <AppText style={s.readyText}>MATCH NETWORK</AppText>
+            </View>
           </View>
           <AppText style={s.communityWelcomeTitle}>
             {hasTeam ? "Build the next match." : "Start with your first team."}
           </AppText>
           <AppText style={s.communityWelcomeBody}>
             {hasTeam
-              ? "Team activity stays in the Team space. Matches are shared across every role."
-              : "Add your players, share availability and arrange a match when you are ready."}
+              ? "Find the right opponent by distance, availability and playing level."
+              : "Create the team, share availability and make the first connection."}
           </AppText>
+          <View style={s.homeNetworkRail}>
+            {[
+              ["location-outline", "NEARBY"],
+              ["stats-chart-outline", "LEVEL"],
+              ["calendar-outline", "READY"],
+            ].map(([icon, label], index) => (
+              <React.Fragment key={label}>
+                {index ? (
+                  <View style={s.homeNetworkLineClip}>
+                    <Animated.View
+                      style={[
+                        s.homeNetworkLine,
+                        { transform: [{ scaleX: networkSignal }] },
+                      ]}
+                    />
+                  </View>
+                ) : null}
+                <View style={s.homeNetworkPoint}>
+                  <Ionicons name={icon} color={C.gold} size={14} />
+                  <AppText style={s.homeNetworkLabel}>{label}</AppText>
+                </View>
+              </React.Fragment>
+            ))}
+          </View>
           <View style={s.communityHomeActions}>
             {hasTeam ? (
               <>
-                <Pressable
+                <MotionPressable
                   style={s.communityPrimaryAction}
                   onPress={onFindFriendly}
                 >
@@ -3938,8 +4304,8 @@ function CommunityHome({
                   <AppText style={s.communityPrimaryActionText}>
                     Find a team
                   </AppText>
-                </Pressable>
-                <Pressable
+                </MotionPressable>
+                <MotionPressable
                   style={s.communitySecondaryAction}
                   onPress={() => setPosting(true)}
                 >
@@ -3947,10 +4313,10 @@ function CommunityHome({
                   <AppText style={s.communitySecondaryActionText}>
                     Post availability
                   </AppText>
-                </Pressable>
+                </MotionPressable>
               </>
             ) : (
-              <Pressable
+              <MotionPressable
                 style={s.communitySecondaryAction}
                 onPress={onOpenTeam}
                 accessibilityRole="button"
@@ -3960,7 +4326,7 @@ function CommunityHome({
                 <AppText style={s.communitySecondaryActionText}>
                   Create your team
                 </AppText>
-              </Pressable>
+              </MotionPressable>
             )}
           </View>
         </View>
@@ -3972,9 +4338,10 @@ function CommunityHome({
                 Community football near you
               </AppText>
             </View>
-            <Pressable onPress={onSeeAll}>
+            <MotionPressable onPress={onSeeAll} style={s.communitySeeAllButton}>
               <AppText style={s.communitySeeAll}>See all</AppText>
-            </Pressable>
+              <Ionicons name="arrow-forward" size={14} color={C.red} />
+            </MotionPressable>
           </View>
           <View style={s.communityMatchCard}>
             {communityFixtures.length ? (
@@ -16693,6 +17060,7 @@ function More({
   onReportOpportunity,
   onSubmitSafetyReport,
   onStartDirectChat,
+  onOpenPublicRoute,
 }) {
   const [section, setSection] = useState(null);
   useEffect(() => {
@@ -16858,6 +17226,16 @@ function More({
     ["trophy-outline", "Leagues", "Join local competitions and view tables"],
     ["globe-outline", "Web", "Public pages, sharing and registrations"],
     ["settings-outline", "Settings", "Alerts, privacy and team account"],
+    [
+      "document-text-outline",
+      "Terms & Conditions",
+      "The rules for using Grassroots",
+    ],
+    [
+      "lock-closed-outline",
+      "Privacy Policy",
+      "How personal and football information is handled",
+    ],
   ];
   return (
     <ScrollView
@@ -16884,7 +17262,13 @@ function More({
         {items.map((item) => (
           <Pressable
             key={item[1]}
-            onPress={() => setSection(item[1])}
+            onPress={() =>
+              item[1] === "Terms & Conditions"
+                ? onOpenPublicRoute("terms")
+                : item[1] === "Privacy Policy"
+                  ? onOpenPublicRoute("privacy")
+                  : setSection(item[1])
+            }
             style={s.moreToolRow}
           >
             <View style={s.moreToolIcon}>
@@ -16911,7 +17295,6 @@ function More({
             </AppText>
           </View>
         </Pressable>
-        <Icons8Credit />
       </View>
     </ScrollView>
   );
@@ -17343,7 +17726,15 @@ function MarketingWelcome({
   );
 }
 
-function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
+function AuthGateway({
+  onGuest,
+  onAuthenticated,
+  canClose = false,
+  onClose,
+  onOpenPublicRoute,
+}) {
+  const { width } = useWindowDimensions();
+  const cinematicWide = width >= 900;
   const [mode, setMode] = useState(canClose ? "signup" : "welcome");
   const [role, setRole] = useState(null);
   const [contactMethod, setContactMethod] = useState("phone");
@@ -17483,107 +17874,170 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
       <SafeAreaView style={s.authSafe}>
         <StatusBar barStyle="light-content" />
         <ScrollView
-          contentContainerStyle={s.authWelcome}
+          contentContainerStyle={s.cinematicWelcome}
           showsVerticalScrollIndicator={false}
         >
-          <View style={s.authBrandRow}>
-            <View style={s.authMark}>
-              <AppText style={s.authMarkText}>F</AppText>
-            </View>
-            <View>
-              <AppText style={s.authBrand}>GRASSROOTS</AppText>
-              <AppText style={s.authBrandSub}>ZIMBABWE · OUR FOOTBALL</AppText>
+          <View style={[s.cinematicHero, cinematicWide && s.cinematicHeroWide]}>
+            <Image
+              source={require("./assets/grassroots-network-hero.jpg")}
+              style={[s.cinematicHeroImage, !cinematicWide && s.cinematicHeroImageMobile]}
+              resizeMode="cover"
+              accessibilityLabel="Community football matches connected across Harare at dusk"
+            />
+            <View style={s.cinematicImageShade} />
+            <View style={s.cinematicLowerShade} />
+            <View style={s.cinematicFrame}>
+              <View style={s.cinematicHeader}>
+                <View style={s.cinematicBrandRow}>
+                  <View style={s.cinematicMark}>
+                    <AppText style={s.cinematicMarkText}>F</AppText>
+                  </View>
+                  <View>
+                    <AppText style={s.cinematicBrand}>GRASSROOTS</AppText>
+                    <AppText style={s.cinematicBrandSub}>ZIMBABWE / OUR FOOTBALL</AppText>
+                  </View>
+                </View>
+                <View style={s.cinematicHeaderActions}>
+                  <Pressable onPress={() => setMode("signin")} style={s.cinematicSignIn}>
+                    <AppText style={s.cinematicSignInText}>SIGN IN</AppText>
+                  </Pressable>
+                  {cinematicWide ? (
+                    <Pressable onPress={() => setMode("signup")} style={s.cinematicCreate}>
+                      <AppText style={s.cinematicCreateText}>JOIN THE NETWORK</AppText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={[s.cinematicHeroBody, cinematicWide && s.cinematicHeroBodyWide]}>
+                <View style={s.cinematicKicker}>
+                  <View style={s.cinematicKickerDot} />
+                  <AppText style={s.cinematicKickerText}>ONE COMMUNITY</AppText>
+                </View>
+                <AppText style={[s.cinematicTitle, cinematicWide && s.cinematicTitleWide]}>
+                  EVERY TEAM.{"\n"}EVERY SUNDAY.
+                </AppText>
+                <AppText style={[s.cinematicIntro, cinematicWide && s.cinematicIntroWide]}>
+                  Find nearby opponents based on location, availability and playing
+                  level. Arrange the match. Build your football history.
+                </AppText>
+
+                <View style={s.cinematicSignalRow}>
+                  {[
+                    ["location-outline", "LOCATION"],
+                    ["speedometer-outline", "PLAYING LEVEL"],
+                    ["calendar-outline", "AVAILABILITY"],
+                  ].map(([icon, label], index) => (
+                    <React.Fragment key={label}>
+                      {index ? <View style={s.cinematicSignalLine} /> : null}
+                      <View style={s.cinematicSignalItem}>
+                        <Ionicons name={icon} size={15} color={C.gold} />
+                        <AppText style={s.cinematicSignalText}>{label}</AppText>
+                      </View>
+                    </React.Fragment>
+                  ))}
+                </View>
+
+                <View style={[s.cinematicEntry, cinematicWide && s.cinematicEntryWide]}>
+                  <AppText style={s.cinematicQuestion}>How are you joining the game?</AppText>
+                  <View style={s.cinematicRoleWrap}>
+                    {ENTRY_ROLES.map(([itemRole, icon]) => {
+                      const active = itemRole === role;
+                      return (
+                        <Pressable
+                          key={itemRole}
+                          onPress={() => setRole(itemRole)}
+                          style={[s.cinematicRoleChip, active && s.cinematicRoleChipActive]}
+                          accessibilityRole="radio"
+                          accessibilityState={{ checked: active }}
+                        >
+                          <Ionicons name={icon} size={16} color={active ? C.redDark : C.white} />
+                          <AppText style={[s.cinematicRoleText, active && s.cinematicRoleTextActive]}>
+                            {itemRole}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Pressable
+                    disabled={!role}
+                    style={[s.cinematicPrimary, !role && s.cinematicPrimaryDisabled]}
+                    onPress={() => onGuest(role)}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !role }}
+                  >
+                    <AppText style={s.cinematicPrimaryText}>
+                      {role ? `EXPLORE AS ${role.toUpperCase()}` : "CHOOSE A ROLE"}
+                    </AppText>
+                    <Ionicons name="arrow-forward" size={20} color={C.redDark} />
+                  </Pressable>
+                  <AppText style={s.cinematicNoPressure}>Look around first. No email needed.</AppText>
+                </View>
+              </View>
+
+              <View style={s.cinematicFootRail}>
+                <AppText style={s.cinematicFootRailText}>MADE FOR THE GROUNDS WE ACTUALLY PLAY ON</AppText>
+                <View style={s.cinematicFootRailRule} />
+                <Ionicons name="football-outline" size={17} color={C.gold} />
+              </View>
             </View>
           </View>
 
-          <View style={s.authHeroCopy}>
-            <View style={s.authGuestPromise}>
-              <Ionicons name="eye-outline" size={15} color={C.gold} />
-              <AppText style={s.authGuestPromiseText}>
-                LOOK AROUND BEFORE YOU SIGN UP
-              </AppText>
-            </View>
-            <AppText style={s.authTitle}>
-              A proper game should be easier to organise.
-            </AppText>
-            <AppText style={s.authIntro}>
-              Find a suitable opponent, agree the details and keep everyone
-              ready for kickoff in one place.
-            </AppText>
-          </View>
-
-          <View style={s.authMatchPreview}>
-            <View style={s.authPreviewTop}>
-              <View style={s.authLiveDot} />
-              <AppText style={s.authPreviewLabel}>ARRANGE A MATCH</AppText>
-            </View>
-            <View style={s.authMatchup}>
-              <View style={s.authMatchupSide}>
-                <View style={s.authMiniCrest}>
-                  <AppText style={s.authMiniCrestText}>YT</AppText>
-                </View>
-                <AppText style={s.authMatchupTeam}>Your team</AppText>
-              </View>
-              <View style={s.authMatchupSignal}>
-                <Ionicons name="swap-horizontal" size={18} color={C.gold} />
-                <AppText style={s.authMatchupSignalText}>MATCH</AppText>
-              </View>
-              <View style={s.authMatchupSide}>
-                <View style={[s.authMiniCrest, s.authMiniCrestAway]}>
-                  <AppText style={s.authMiniCrestText}>NT</AppText>
-                </View>
-                <AppText style={s.authMatchupTeam}>Nearby team</AppText>
-              </View>
-            </View>
-            <View style={s.authFitReasons}>
-              <View style={s.authFitReason}>
-                <Ionicons name="location-outline" size={15} color={C.gold} />
-                <AppText style={s.authFitReasonText}>Choose your area</AppText>
-              </View>
-              <View style={s.authFitReason}>
-                <Ionicons
-                  name="shield-checkmark-outline"
-                  size={15}
-                  color={C.gold}
-                />
-                <AppText style={s.authFitReasonText}>
-                  Confirm the details
+          <View style={s.cinematicHow}>
+            <View style={[s.cinematicHowInner, cinematicWide && s.cinematicHowInnerWide]}>
+              <View style={s.cinematicHowLead}>
+                <AppText style={s.cinematicHowEyebrow}>FROM CHAT TO KICKOFF</AppText>
+                <AppText style={[s.cinematicHowTitle, cinematicWide && s.cinematicHowTitleWide]}>
+                  Football starts with a team ready to play.
+                </AppText>
+                <AppText style={s.cinematicHowCopy}>
+                  More teams in the network means more suitable matches for everyone—not
+                  just the same opponent every weekend.
                 </AppText>
               </View>
+              <View style={s.cinematicSteps}>
+                {[
+                  ["01", "Set the day", "Post when and where your team can play."],
+                  ["02", "Find the fit", "See teams matched by distance and level."],
+                  ["03", "Play and record", "Confirm the fixture and keep the result."],
+                ].map(([number, title, copy]) => (
+                  <View key={number} style={s.cinematicStep}>
+                    <AppText style={s.cinematicStepNumber}>{number}</AppText>
+                    <View style={s.cinematicStepCopyWrap}>
+                      <AppText style={s.cinematicStepTitle}>{title}</AppText>
+                      <AppText style={s.cinematicStepCopy}>{copy}</AppText>
+                    </View>
+                    <Ionicons name="arrow-forward" size={21} color={C.red} />
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
 
-          <View style={s.authDecision}>
-            <AppText style={s.authQuestion}>What brings you here?</AppText>
-            {rolePicker}
-            <Pressable
-              disabled={!role}
-              style={[s.authPrimaryButton, !role && s.authPrimaryButtonDisabled]}
-              onPress={() => onGuest(role)}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !role }}
-            >
-              <AppText style={s.authPrimaryButtonText}>
-                {role ? `Explore as ${role}` : "Choose a role to explore"}
-              </AppText>
-              <Ionicons name="arrow-forward" size={20} color={C.redDark} />
-            </Pressable>
-            <AppText style={s.authNoPressure}>
-              No email needed. Your progress stays on this phone.
-            </AppText>
-            <View style={s.authAccountRow}>
-              <Pressable
-                onPress={() => setMode("signin")}
-                style={s.authTextButton}
-              >
-                <AppText style={s.authTextButtonLabel}>Sign in</AppText>
+          <View style={s.cinematicJoinBand}>
+            <View style={[s.cinematicJoinInner, cinematicWide && s.cinematicJoinInnerWide]}>
+              <View style={s.cinematicJoinCopy}>
+                <AppText style={s.cinematicJoinTitle}>MORE TEAMS. BETTER MATCHES.</AppText>
+                <AppText style={s.cinematicJoinText}>
+                  Join the network and make Sunday football easier to organise.
+                </AppText>
+              </View>
+              <Pressable onPress={() => setMode("signup")} style={s.cinematicJoinButton}>
+                <AppText style={s.cinematicJoinButtonText}>CREATE ACCOUNT</AppText>
+                <Ionicons name="arrow-forward" size={20} color={C.white} />
               </Pressable>
-              <View style={s.authDivider} />
-              <Pressable
-                onPress={() => setMode("signup")}
-                style={s.authTextButton}
-              >
-                <AppText style={s.authTextButtonLabel}>Create account</AppText>
+            </View>
+            <View style={s.cinematicFooter}>
+              <View style={s.cinematicFooterLinks}>
+                <Pressable onPress={() => onOpenPublicRoute("/terms")}>
+                  <AppText style={s.cinematicFooterLink}>Terms</AppText>
+                </Pressable>
+                <Pressable onPress={() => onOpenPublicRoute("/privacy")}>
+                  <AppText style={s.cinematicFooterLink}>Privacy</AppText>
+                </Pressable>
+              </View>
+              <Pressable onPress={() => setMode("signin")}>
+                <AppText style={s.cinematicFooterLink}>Already joined? Sign in</AppText>
               </Pressable>
             </View>
           </View>
@@ -17743,6 +18197,7 @@ function AuthGateway({ onGuest, onAuthenticated, canClose = false, onClose }) {
                 : "Need an account? Create one"}
             </AppText>
           </Pressable>
+          <LegalLinks onOpen={onOpenPublicRoute} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -19947,6 +20402,7 @@ function RoleWorkspace({
   leagues = [],
   onSponsorCompetition,
   onStartDirectChat,
+  onOpenPublicRoute,
 }) {
   const [detail, setDetail] = useState(null);
   const [draft, setDraft] = useState("");
@@ -21279,11 +21735,24 @@ function RoleWorkspace({
               label="VIEW"
             />
           ) : null}
+          <RoleAction
+            icon="document-text-outline"
+            title="Terms & Conditions"
+            copy="The rules for using Grassroots"
+            action={() => onOpenPublicRoute("terms")}
+            label="OPEN"
+          />
+          <RoleAction
+            icon="lock-closed-outline"
+            title="Privacy Policy"
+            copy="How personal and football information is handled"
+            action={() => onOpenPublicRoute("privacy")}
+            label="OPEN"
+          />
           </View>
         </ScrollView>
         <View style={s.roleMoreFooter}>
           <SignOutAction onSignOut={onSignOut} compact />
-          <Icons8Credit />
         </View>
       </View>
     );
@@ -21398,6 +21867,13 @@ function RoleWorkspace({
 
 function App() {
   const [tab, setTab] = useState("Home");
+  const reducedMotion = useReducedMotionPreference();
+  const screenMotion = useRef(new Animated.Value(1)).current;
+  const [publicRoute, setPublicRoute] = useState(() =>
+    Platform.OS === "web" && globalThis.location?.href
+      ? publicRouteFromUrl(globalThis.location.href)
+      : null,
+  );
   const [teamFinderRequested, setTeamFinderRequested] = useState(false);
   const [authSession, setAuthSession] = useState(undefined);
   const [authOpen, setAuthOpen] = useState(false);
@@ -21445,8 +21921,38 @@ function App() {
     Archivo_900Black,
   });
   useEffect(() => {
+    if (reducedMotion) {
+      screenMotion.setValue(1);
+      return;
+    }
+    screenMotion.stopAnimation();
+    screenMotion.setValue(0.86);
+    Animated.timing(screenMotion, {
+      toValue: 1,
+      duration: 190,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
+  }, [reducedMotion, screenMotion, tab]);
+  useEffect(() => {
     const startupFallback = setTimeout(() => setStartupTimedOut(true), 5000);
     return () => clearTimeout(startupFallback);
+  }, []);
+  useEffect(() => {
+    const handlePublicLink = (url) => setPublicRoute(publicRouteFromUrl(url));
+    Linking.getInitialURL()
+      .then(handlePublicLink)
+      .catch(() => {});
+    const subscription = Linking.addEventListener("url", ({ url }) =>
+      handlePublicLink(url),
+    );
+    const handlePopState = () => handlePublicLink(globalThis.location?.href);
+    if (Platform.OS === "web")
+      globalThis.addEventListener?.("popstate", handlePopState);
+    return () => {
+      subscription.remove();
+      if (Platform.OS === "web")
+        globalThis.removeEventListener?.("popstate", handlePopState);
+    };
   }, []);
   useEffect(() => {
     const handleLeagueLink = (url) => {
@@ -21918,15 +22424,42 @@ function App() {
     }));
     setUserRole("Player");
   }, [setRoleData, setUserRole, userRole]);
-  if (
+  const uiLoading =
     (!ready && !startupTimedOut) ||
     (!fontsLoaded && !fontError && !startupTimedOut) ||
     (!roleHydrated && !startupTimedOut) ||
     (!dataHydrated && !startupTimedOut) ||
-    (!teamHydrated && !startupTimedOut) ||
-    (authSession === undefined && !startupTimedOut)
-  )
-    return <AppLoader />;
+    (!teamHydrated && !startupTimedOut);
+  if (uiLoading) return <AppLoader />;
+  const openPublicRoute = (route) => {
+    if (Platform.OS === "web" && globalThis.history?.pushState) {
+      const path = route === "terms" ? "/terms" : route === "privacy" ? "/privacy" : "/";
+      globalThis.history.pushState({}, "", path);
+    }
+    setPublicRoute(route);
+  };
+  const closePublicRoute = () => {
+    if (Platform.OS === "web" && globalThis.history?.pushState)
+      globalThis.history.pushState({}, "", "/");
+    setPublicRoute(null);
+  };
+  if (publicRoute === "terms" || publicRoute === "privacy")
+    return (
+      <LegalPage
+        key={publicRoute}
+        kind={publicRoute}
+        onClose={closePublicRoute}
+        onSwitch={openPublicRoute}
+      />
+    );
+  if (publicRoute === "not-found")
+    return (
+      <NotFoundPage
+        onHome={closePublicRoute}
+        onOpenLegal={openPublicRoute}
+      />
+    );
+  if (authSession === undefined && !startupTimedOut) return <AppLoader />;
   if (userRole === "Guest Player") return <AppLoader />;
   const enterGuest = async (role) => {
     const session = await createGuestSession(role);
@@ -21955,6 +22488,7 @@ function App() {
         onAuthenticated={enterAccount}
         canClose={Boolean(authSession?.type === "guest" && userRole)}
         onClose={() => setAuthOpen(false)}
+        onOpenPublicRoute={openPublicRoute}
       />
     );
   const signOut = async () => {
@@ -22830,6 +23364,7 @@ function App() {
               onReportOpportunity={flagOpportunity}
               onSubmitSafetyReport={submitSafetyReport}
               onStartDirectChat={startDirectChat}
+              onOpenPublicRoute={openPublicRoute}
             />
           ),
         }
@@ -22867,6 +23402,7 @@ function App() {
                 leagues={leagues}
                 onSponsorCompetition={sponsorCompetition}
                 onStartDirectChat={startDirectChat}
+                onOpenPublicRoute={openPublicRoute}
               />
             ),
         };
@@ -22897,19 +23433,40 @@ function App() {
           onRemove={removeRole}
         />
       ) : null}
-      <View style={{ flex: 1 }}>{screens[tab]}</View>
+      <Animated.View
+        style={[
+          s.screenStage,
+          {
+            opacity: screenMotion,
+            transform: [
+              {
+                translateY: screenMotion.interpolate({
+                  inputRange: [0.86, 1],
+                  outputRange: reducedMotion ? [0, 0] : [6, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        {screens[tab]}
+      </Animated.View>
       <View style={s.bottomNav}>
         {navItems.map((x) => {
           const active = tab === x[0];
           const home = x[0] === "Home";
           return (
-            <Pressable
+            <MotionPressable
               key={x[0]}
               accessibilityRole="tab"
               accessibilityLabel={x[0]}
               accessibilityState={{ selected: active }}
               onPress={() => setTab(x[0])}
-              style={[s.navItem, home && s.homeNavItem]}
+              style={[
+                s.navItem,
+                active && !home && s.navItemActive,
+                home && s.homeNavItem,
+              ]}
             >
               {home ? (
                 <View
@@ -22921,7 +23478,7 @@ function App() {
                 <Ionicons
                   name={x[1]}
                   size={21}
-                  color={active ? C.red : C.muted}
+                  color={active ? C.gold : C.shellMuted}
                 />
               )}
               <AppText
@@ -22933,7 +23490,7 @@ function App() {
               >
                 {x[0]}
               </AppText>
-            </Pressable>
+            </MotionPressable>
           );
         })}
       </View>
@@ -22942,13 +23499,17 @@ function App() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.cream },
+  safe: { flex: 1, backgroundColor: "#F4F1F6" },
+  screenStage: { flex: 1 },
   header: {
-    height: 70,
+    minHeight: 76,
     paddingHorizontal: 16,
+    backgroundColor: C.shell,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: C.shellLine,
   },
   logo: {
     width: 36,
@@ -22971,6 +23532,39 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   friendliesMarkText: { color: C.white, fontSize: 22, fontFamily: F.black },
+  brandHeaderTitle: {
+    color: C.white,
+    fontSize: 18,
+    fontFamily: F.black,
+    letterSpacing: -0.35,
+  },
+  brandHeaderSub: {
+    color: "#BFAFCA",
+    fontSize: 8,
+    letterSpacing: 0.8,
+    fontFamily: F.semibold,
+  },
+  headerNetworkState: {
+    minHeight: 28,
+    paddingHorizontal: 9,
+    borderRadius: 14,
+    backgroundColor: C.shellRaised,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  headerNetworkDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.gold,
+  },
+  headerNetworkText: {
+    color: C.white,
+    fontSize: 8,
+    fontFamily: F.bold,
+    letterSpacing: 0.55,
+  },
   clubLogo: { width: 38, height: 42 },
   headerTitle: { fontSize: 18, fontFamily: F.black, letterSpacing: -0.35 },
   headerSub: {
@@ -23485,13 +24079,14 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   bottomNav: {
-    height: 66,
-    backgroundColor: "white",
+    height: 70,
+    backgroundColor: C.shell,
     borderTopWidth: 1,
-    borderColor: C.line,
+    borderColor: C.shellLine,
     flexDirection: "row",
     overflow: "visible",
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    paddingTop: 3,
   },
   navItem: {
     flex: 1,
@@ -23499,7 +24094,9 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 5,
     minHeight: 48,
+    borderRadius: 10,
   },
+  navItemActive: { backgroundColor: C.shellRaised },
   homeNavItem: { zIndex: 2 },
   homeNavCircle: {
     width: 54,
@@ -23509,15 +24106,15 @@ const s = StyleSheet.create({
     marginBottom: -3,
     backgroundColor: C.gold,
     borderWidth: 4,
-    borderColor: C.white,
+    borderColor: C.shell,
     alignItems: "center",
     justifyContent: "center",
     elevation: 0,
   },
   homeNavCircleActive: { transform: [{ scale: 1.04 }] },
-  navText: { fontSize: 10, color: C.muted, fontFamily: F.semibold },
-  navTextActive: { color: C.red },
-  homeNavText: { color: C.redDark, fontSize: 9, fontFamily: F.bold },
+  navText: { fontSize: 10, color: C.shellMuted, fontFamily: F.semibold },
+  navTextActive: { color: C.gold },
+  homeNavText: { color: C.gold, fontSize: 9, fontFamily: F.bold },
   guestBar: {
     minHeight: 42,
     paddingHorizontal: 16,
@@ -24773,11 +25370,21 @@ const s = StyleSheet.create({
     borderColor: C.line,
   },
   communityWelcome: {
+    minHeight: 410,
     marginHorizontal: 12,
-    padding: 18,
-    borderRadius: 14,
-    backgroundColor: C.redDark,
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: C.shell,
     overflow: "hidden",
+  },
+  communityWelcomeImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+  },
+  communityWelcomeShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(12, 4, 18, 0.74)",
   },
   communityWelcomeTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   homeTeamBadge: {
@@ -24792,7 +25399,7 @@ const s = StyleSheet.create({
   },
   homeTeamBadgeText: { color: "white", fontSize: 12, fontFamily: F.black },
   homeGreeting: { color: "white", fontSize: 13, fontFamily: F.bold },
-  homeTeamMeta: { color: "#D7C8E6", fontSize: 9, marginTop: 3 },
+  homeTeamMeta: { color: "#CDBED8", fontSize: 9, marginTop: 3 },
   readyPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -24806,25 +25413,54 @@ const s = StyleSheet.create({
   readyText: { color: "white", fontSize: 8, fontFamily: F.bold },
   communityWelcomeTitle: {
     color: "white",
-    fontSize: 29,
-    lineHeight: 32,
+    fontSize: 34,
+    lineHeight: 36,
     fontFamily: F.black,
-    letterSpacing: -0.7,
-    marginTop: 24,
-    maxWidth: 290,
+    letterSpacing: -1.1,
+    marginTop: 34,
+    maxWidth: 320,
   },
   communityWelcomeBody: {
     color: "#D7C8E6",
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 8,
-    maxWidth: 310,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 10,
+    maxWidth: 330,
   },
-  communityHomeActions: { flexDirection: "row", gap: 8, marginTop: 20 },
+  homeNetworkRail: {
+    width: "100%",
+    maxWidth: 620,
+    minHeight: 42,
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  homeNetworkPoint: { flexDirection: "row", alignItems: "center", gap: 5 },
+  homeNetworkLabel: {
+    color: C.white,
+    fontSize: 8,
+    fontFamily: F.bold,
+    letterSpacing: 0.65,
+  },
+  homeNetworkLineClip: {
+    flex: 1,
+    height: 8,
+    marginHorizontal: 8,
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  homeNetworkLine: { height: 1, width: "100%", backgroundColor: C.gold },
+  communityHomeActions: {
+    width: "100%",
+    maxWidth: 620,
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 18,
+  },
   communityPrimaryAction: {
     flex: 1,
-    minHeight: 46,
-    borderRadius: 4,
+    minHeight: 50,
+    borderRadius: 3,
     backgroundColor: C.gold,
     flexDirection: "row",
     alignItems: "center",
@@ -24838,8 +25474,8 @@ const s = StyleSheet.create({
   },
   communitySecondaryAction: {
     flex: 1,
-    minHeight: 46,
-    borderRadius: 4,
+    minHeight: 50,
+    borderRadius: 3,
     backgroundColor: C.red,
     flexDirection: "row",
     alignItems: "center",
@@ -24851,7 +25487,7 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontFamily: F.bold,
   },
-  communityHomeSection: { paddingHorizontal: 16, paddingTop: 22 },
+  communityHomeSection: { paddingHorizontal: 16, paddingTop: 30 },
   communitySectionHead: {
     flexDirection: "row",
     alignItems: "center",
@@ -24867,8 +25503,17 @@ const s = StyleSheet.create({
   },
   communitySectionSub: { fontSize: 9, color: C.muted, marginTop: 3 },
   communitySeeAll: { fontSize: 10, fontFamily: F.bold, color: C.red },
+  communitySeeAllButton: {
+    minHeight: 40,
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
   communityMatchCard: {
-    gap: 12,
+    overflow: "hidden",
+    borderRadius: 12,
+    backgroundColor: C.white,
   },
   upcomingMatchCard: {
     padding: 14,
@@ -25038,21 +25683,23 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 8,
   },
-  screenIntro: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 18 },
+  screenIntro: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 18 },
   screenTitle: {
-    fontSize: 30,
-    lineHeight: 34,
+    fontSize: 32,
+    lineHeight: 36,
     fontFamily: F.black,
     letterSpacing: -0.7,
     color: C.ink,
     marginBottom: 5,
   },
   communitySegments: {
-    minHeight: 44,
+    minHeight: 48,
+    marginHorizontal: 16,
+    marginBottom: 14,
     flexDirection: "row",
     padding: 4,
-    borderRadius: 10,
-    backgroundColor: "#E9E5EC",
+    borderRadius: 9,
+    backgroundColor: "#E6E0EA",
     gap: 3,
   },
   communitySegment: {
@@ -25064,9 +25711,9 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 5,
   },
-  communitySegmentActive: { backgroundColor: "white" },
+  communitySegmentActive: { backgroundColor: C.redDark },
   communitySegmentText: { fontSize: 10, fontFamily: F.bold, color: C.muted },
-  communitySegmentTextActive: { color: C.red },
+  communitySegmentTextActive: { color: C.white },
   segmentBadge: {
     minWidth: 18,
     height: 18,
@@ -27390,6 +28037,330 @@ const s = StyleSheet.create({
     lineHeight: 16,
     marginTop: 16,
   },
+  cinematicWelcome: {
+    flexGrow: 1,
+    backgroundColor: "#0B0610",
+  },
+  cinematicHero: {
+    minHeight: 980,
+    overflow: "hidden",
+    backgroundColor: "#0B0610",
+  },
+  cinematicHeroWide: { minHeight: 860 },
+  cinematicHeroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+  },
+  cinematicHeroImageMobile: {
+    width: "176%",
+    left: "-76%",
+  },
+  cinematicImageShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(10, 4, 15, 0.43)",
+  },
+  cinematicLowerShade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "58%",
+    backgroundColor: "rgba(10, 4, 15, 0.64)",
+  },
+  cinematicFrame: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 1440,
+    alignSelf: "center",
+    paddingHorizontal: 22,
+    paddingTop: 16,
+    paddingBottom: 18,
+  },
+  cinematicHeader: {
+    minHeight: 66,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.25)",
+  },
+  cinematicBrandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cinematicMark: {
+    width: 39,
+    height: 43,
+    borderRadius: 6,
+    backgroundColor: C.red,
+    borderWidth: 2,
+    borderColor: C.gold,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cinematicMarkText: { color: C.white, fontSize: 22, fontFamily: F.black },
+  cinematicBrand: {
+    color: C.white,
+    fontSize: 14,
+    lineHeight: 16,
+    fontFamily: F.black,
+    letterSpacing: 0.2,
+  },
+  cinematicBrandSub: {
+    color: "#D7C8E6",
+    fontSize: 8,
+    lineHeight: 11,
+    marginTop: 2,
+    fontFamily: F.bold,
+    letterSpacing: 0.65,
+  },
+  cinematicHeaderActions: { flexDirection: "row", alignItems: "center", gap: 9 },
+  cinematicSignIn: {
+    minHeight: 44,
+    paddingHorizontal: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cinematicSignInText: {
+    color: C.white,
+    fontSize: 10,
+    fontFamily: F.bold,
+    letterSpacing: 0.8,
+  },
+  cinematicCreate: {
+    minHeight: 42,
+    borderRadius: 22,
+    backgroundColor: C.white,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cinematicCreateText: {
+    color: C.redDark,
+    fontSize: 10,
+    fontFamily: F.bold,
+    letterSpacing: 0.7,
+  },
+  cinematicHeroBody: {
+    flex: 1,
+    justifyContent: "center",
+    paddingTop: 42,
+    paddingBottom: 34,
+  },
+  cinematicHeroBodyWide: { maxWidth: 720, paddingTop: 56 },
+  cinematicKicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 13,
+  },
+  cinematicKickerDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: C.gold,
+  },
+  cinematicKickerText: {
+    color: C.gold,
+    fontSize: 11,
+    fontFamily: F.bold,
+    letterSpacing: 1.5,
+  },
+  cinematicTitle: {
+    color: C.white,
+    fontSize: 49,
+    lineHeight: 48,
+    fontFamily: F.black,
+    letterSpacing: -2.6,
+  },
+  cinematicTitleWide: {
+    fontSize: 76,
+    lineHeight: 72,
+    letterSpacing: -4.3,
+  },
+  cinematicIntro: {
+    maxWidth: 560,
+    color: "#F0EAF4",
+    fontSize: 15,
+    lineHeight: 23,
+    marginTop: 18,
+  },
+  cinematicIntroWide: { fontSize: 17, lineHeight: 26 },
+  cinematicSignalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 22,
+  },
+  cinematicSignalItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  cinematicSignalLine: {
+    width: 22,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.42)",
+  },
+  cinematicSignalText: {
+    color: C.white,
+    fontSize: 9,
+    fontFamily: F.bold,
+    letterSpacing: 0.7,
+  },
+  cinematicEntry: {
+    maxWidth: 620,
+    marginTop: 35,
+    paddingTop: 19,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.31)",
+  },
+  cinematicEntryWide: { marginTop: 42 },
+  cinematicQuestion: { color: C.white, fontSize: 15, fontFamily: F.bold },
+  cinematicRoleWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 14,
+  },
+  cinematicRoleChip: {
+    minHeight: 42,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.48)",
+    backgroundColor: "rgba(24,11,32,0.70)",
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  cinematicRoleChipActive: { backgroundColor: C.gold, borderColor: C.gold },
+  cinematicRoleText: { color: C.white, fontSize: 12, fontFamily: F.semibold },
+  cinematicRoleTextActive: { color: C.redDark },
+  cinematicPrimary: {
+    minHeight: 54,
+    width: "100%",
+    maxWidth: 620,
+    borderRadius: 2,
+    paddingHorizontal: 18,
+    backgroundColor: C.gold,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cinematicPrimaryDisabled: { opacity: 0.62 },
+  cinematicPrimaryText: {
+    color: C.redDark,
+    fontSize: 13,
+    fontFamily: F.black,
+    letterSpacing: 0.65,
+  },
+  cinematicNoPressure: { color: "#D7C8E6", fontSize: 10, marginTop: 9 },
+  cinematicFootRail: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.25)",
+  },
+  cinematicFootRailText: {
+    color: "#D7C8E6",
+    fontSize: 8,
+    fontFamily: F.bold,
+    letterSpacing: 0.8,
+  },
+  cinematicFootRailRule: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.24)" },
+  cinematicHow: { backgroundColor: "#F2EEF5", paddingHorizontal: 22, paddingVertical: 74 },
+  cinematicHowInner: { width: "100%", maxWidth: 1240, alignSelf: "center", gap: 44 },
+  cinematicHowInnerWide: { flexDirection: "row", gap: 90, paddingVertical: 28 },
+  cinematicHowLead: { flex: 0.9 },
+  cinematicHowEyebrow: {
+    color: C.red,
+    fontSize: 10,
+    fontFamily: F.bold,
+    letterSpacing: 1.2,
+    marginBottom: 13,
+  },
+  cinematicHowTitle: {
+    color: C.ink,
+    fontSize: 38,
+    lineHeight: 41,
+    fontFamily: F.black,
+    letterSpacing: -1.6,
+  },
+  cinematicHowTitleWide: { fontSize: 52, lineHeight: 54, letterSpacing: -2.4 },
+  cinematicHowCopy: {
+    maxWidth: 470,
+    color: C.muted,
+    fontSize: 15,
+    lineHeight: 23,
+    marginTop: 18,
+  },
+  cinematicSteps: { flex: 1.1, borderTopWidth: 1, borderTopColor: "#CFC5D7" },
+  cinematicStep: {
+    minHeight: 104,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 17,
+    borderBottomWidth: 1,
+    borderBottomColor: "#CFC5D7",
+  },
+  cinematicStepNumber: {
+    width: 32,
+    color: C.red,
+    fontSize: 12,
+    fontFamily: F.black,
+    fontVariant: ["tabular-nums"],
+  },
+  cinematicStepCopyWrap: { flex: 1 },
+  cinematicStepTitle: { color: C.ink, fontSize: 18, fontFamily: F.black },
+  cinematicStepCopy: { color: C.muted, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  cinematicJoinBand: { backgroundColor: C.redDark, paddingHorizontal: 22, paddingTop: 52 },
+  cinematicJoinInner: { width: "100%", maxWidth: 1240, alignSelf: "center", gap: 25 },
+  cinematicJoinInnerWide: {
+    minHeight: 180,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cinematicJoinCopy: { flex: 1 },
+  cinematicJoinTitle: {
+    color: C.white,
+    fontSize: 32,
+    lineHeight: 34,
+    fontFamily: F.black,
+    letterSpacing: -1.4,
+  },
+  cinematicJoinText: { color: "#D7C8E6", fontSize: 14, lineHeight: 21, marginTop: 8 },
+  cinematicJoinButton: {
+    minHeight: 54,
+    minWidth: 230,
+    borderWidth: 1,
+    borderColor: C.white,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 18,
+  },
+  cinematicJoinButtonText: {
+    color: C.white,
+    fontSize: 12,
+    fontFamily: F.bold,
+    letterSpacing: 0.7,
+  },
+  cinematicFooter: {
+    width: "100%",
+    maxWidth: 1240,
+    minHeight: 82,
+    alignSelf: "center",
+    marginTop: 38,
+    borderTopWidth: 1,
+    borderTopColor: "#60436F",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 18,
+  },
+  cinematicFooterLinks: { flexDirection: "row", gap: 20 },
+  cinematicFooterLink: { color: "#CDBED8", fontSize: 11, fontFamily: F.semibold },
   authWelcome: {
     flexGrow: 1,
     paddingHorizontal: 20,
@@ -28457,7 +29428,7 @@ const s = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: "#D93B4B",
     borderWidth: 2,
-    borderColor: C.cream,
+    borderColor: C.shell,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -28548,18 +29519,6 @@ const s = StyleSheet.create({
     backgroundColor: C.cream,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: C.line,
-  },
-  icons8Credit: {
-    alignSelf: "center",
-    minHeight: 40,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  icons8CreditText: {
-    color: C.muted,
-    fontSize: 11,
-    textDecorationLine: "underline",
   },
   conversationMessages: {
     flexGrow: 1,
@@ -29165,6 +30124,270 @@ const s = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: C.redDark,
     gap: 5,
+  },
+  legalLinks: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    marginTop: 14,
+    paddingHorizontal: 12,
+  },
+  legalLinkText: {
+    color: C.redDark,
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: F.semibold,
+    textDecorationLine: "underline",
+  },
+  legalLinkTextLight: { color: C.white },
+  legalLinkDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.muted,
+  },
+  legalLinkDotLight: { backgroundColor: "#BFAED0" },
+  legalSafe: { flex: 1, backgroundColor: C.cream },
+  legalHeader: {
+    minHeight: 72,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: C.white,
+    borderBottomWidth: 1,
+    borderBottomColor: C.line,
+  },
+  legalBackButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: -8,
+  },
+  legalContent: {
+    width: "100%",
+    maxWidth: 820,
+    alignSelf: "center",
+    paddingBottom: 48,
+  },
+  legalIntro: {
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 26,
+    backgroundColor: C.redDark,
+  },
+  legalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF12",
+    marginBottom: 20,
+  },
+  legalTitle: {
+    maxWidth: 600,
+    color: C.white,
+    fontSize: 34,
+    lineHeight: 39,
+    letterSpacing: -0.9,
+    fontFamily: F.black,
+  },
+  legalUpdated: {
+    marginTop: 8,
+    color: C.gold,
+    fontSize: 10,
+    lineHeight: 15,
+    fontFamily: F.bold,
+  },
+  legalSummary: {
+    maxWidth: 620,
+    marginTop: 16,
+    color: "#E3D8EC",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  legalDocument: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: C.white,
+  },
+  legalSection: {
+    flexDirection: "row",
+    gap: 14,
+    paddingVertical: 23,
+    borderBottomWidth: 1,
+    borderBottomColor: C.line,
+  },
+  legalSectionNumber: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.cream,
+  },
+  legalSectionNumberText: {
+    color: C.red,
+    fontSize: 11,
+    fontFamily: F.black,
+    fontVariant: ["tabular-nums"],
+  },
+  legalSectionBody: { flex: 1, maxWidth: 680 },
+  legalSectionTitle: {
+    color: C.ink,
+    fontSize: 17,
+    lineHeight: 22,
+    fontFamily: F.black,
+    marginBottom: 8,
+  },
+  legalParagraph: {
+    color: "#453D4D",
+    fontSize: 13,
+    lineHeight: 21,
+    marginBottom: 9,
+  },
+  legalSwitchPanel: {
+    marginHorizontal: 20,
+    marginTop: 24,
+    padding: 18,
+    borderRadius: 12,
+    backgroundColor: C.redDark,
+  },
+  legalSwitchTitle: {
+    color: C.white,
+    fontSize: 16,
+    lineHeight: 21,
+    fontFamily: F.bold,
+  },
+  legalSwitchButton: {
+    minHeight: 48,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: C.gold,
+  },
+  legalSwitchButtonText: {
+    color: C.redDark,
+    fontSize: 12,
+    fontFamily: F.black,
+  },
+  notFoundSafe: {
+    flex: 1,
+    overflow: "hidden",
+    backgroundColor: C.redDark,
+  },
+  notFoundPitch: {
+    position: "absolute",
+    top: -90,
+    right: -130,
+    width: 430,
+    height: 650,
+    borderWidth: 2,
+    borderColor: "#FFFFFF18",
+    transform: [{ rotate: "18deg" }],
+  },
+  notFoundHalfwayLine: {
+    position: "absolute",
+    top: "50%",
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "rgba(20, 8, 28, 0.72)",
+  },
+  notFoundCircle: {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    width: 170,
+    height: 170,
+    marginLeft: -85,
+    marginTop: -85,
+    borderRadius: 85,
+    borderWidth: 2,
+    borderColor: "#FFFFFF18",
+  },
+  notFoundBall: {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    width: 58,
+    height: 58,
+    marginLeft: -29,
+    marginTop: -29,
+    borderRadius: 29,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.gold,
+  },
+  notFoundContent: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 620,
+    alignSelf: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 36,
+  },
+  notFoundCodeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginBottom: 20,
+  },
+  notFoundCode: {
+    color: C.white,
+    fontSize: 72,
+    lineHeight: 76,
+    letterSpacing: -2.2,
+    fontFamily: F.black,
+  },
+  notFoundZero: {
+    width: 65,
+    height: 65,
+    borderRadius: 33,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: C.gold,
+  },
+  notFoundTitle: {
+    maxWidth: 520,
+    color: C.white,
+    fontSize: 36,
+    lineHeight: 40,
+    letterSpacing: -1,
+    fontFamily: F.black,
+  },
+  notFoundCopy: {
+    maxWidth: 460,
+    marginTop: 13,
+    color: "#D7C8E6",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  notFoundButton: {
+    width: "100%",
+    maxWidth: 330,
+    minHeight: 52,
+    marginTop: 28,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: C.gold,
+  },
+  notFoundButtonText: {
+    color: C.redDark,
+    fontSize: 13,
+    fontFamily: F.black,
   },
 });
 export default function FriendliesRoot() {
