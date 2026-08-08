@@ -17745,42 +17745,22 @@ function AuthGateway({
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const setAuthError = (why, action) =>
-    setError(
-      actionErrorText(
-        mode === "signup" ? "Account setup stopped." : "Sign in stopped.",
-        why,
-        action,
-      ),
-    );
+  const setAuthError = (message) => setError(message);
 
   const submit = async () => {
     setError("");
     if (contactMethod === "email" && (!email.trim() || !email.includes("@")))
-      return setAuthError(
-        "The email address is incomplete or has the wrong format.",
-        "Check the address and enter it like name@example.com.",
-      );
+      return setAuthError("Enter a valid email address.");
     if (contactMethod === "phone" && !normalizeZimbabwePhone(phoneNumber))
       return setAuthError(
-        "The mobile number is not a valid Zimbabwe number.",
-        "Enter the number beginning with 07 or +263.",
+        "Enter a valid Zimbabwe mobile number beginning with 07 or +263.",
       );
     if (mode === "signup" && name.trim().length < 2)
-      return setAuthError(
-        "A profile name has not been entered.",
-        "Add the name your football community knows you by.",
-      );
+      return setAuthError("Enter your name.");
     if (mode === "signup" && !role)
-      return setAuthError(
-        "No main football role was selected.",
-        "Choose Player, Coach, Referee, Scout or Sponsor.",
-      );
+      return setAuthError("Choose your main football role.");
     if (password.length < 8)
-      return setAuthError(
-        "The password has fewer than 8 characters.",
-        "Create a password containing at least 8 characters.",
-      );
+      return setAuthError("Your password must be at least 8 characters.");
     setBusy(true);
     try {
       const session =
@@ -17798,10 +17778,7 @@ function AuthGateway({
             });
       onAuthenticated(session);
     } catch (submitError) {
-      setAuthError(
-        submitError.message || "The account service did not complete the request.",
-        "Check your details and connection, then try again.",
-      );
+      setAuthError(submitError.message || "We couldn't complete that. Try again.");
     } finally {
       setBusy(false);
     }

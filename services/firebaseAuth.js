@@ -50,21 +50,21 @@ function safeRoles(roles, primaryRole) {
 function readableAuthError(error) {
   switch (error?.code) {
     case "auth/email-already-in-use":
-      return "An account with these details already exists.";
+      return "An account already exists for this email or phone number. Try signing in.";
     case "auth/invalid-credential":
     case "auth/user-not-found":
     case "auth/wrong-password":
-      return "The phone number, email or password is incorrect.";
+      return "The email, phone number or password you entered is incorrect.";
     case "auth/invalid-email":
-      return "The email address has an invalid format.";
+      return "Enter a valid email address.";
     case "auth/weak-password":
-      return "The password does not meet the minimum security requirement.";
+      return "Your password must be at least 8 characters.";
     case "auth/network-request-failed":
-      return "The device could not reach the account service.";
+      return "We couldn't connect. Check your internet connection and try again.";
     case "auth/too-many-requests":
-      return "The account service temporarily paused requests after repeated attempts.";
+      return "Too many attempts. Wait a few minutes, then try again.";
     default:
-      return "The account service did not complete the request.";
+      return "We couldn't complete that. Try again.";
   }
 }
 
