@@ -137,40 +137,64 @@ import { fetchLiveScores, liveRecordToFixture } from "./services/liveScores";
 import { rankOpponentCandidates } from "./services/communityAlgorithms";
 import { rankRefereeAssignments } from "./services/roleAlgorithms";
 import { normalizeZimbabwePhone } from "./services/accountIdentifiers";
+import { UiPrefsProvider, useUiPrefs, displayText, readableSize, LANGS } from "./services/uiPrefs";
+import { SCREEN_HELP, translate } from "./services/translations";
+import { speakText, stopSpeaking } from "./services/voice";
 
-const Archivo_400Regular = require("@expo-google-fonts/archivo/400Regular/Archivo_400Regular.ttf");
-const Archivo_500Medium = require("@expo-google-fonts/archivo/500Medium/Archivo_500Medium.ttf");
-const Archivo_600SemiBold = require("@expo-google-fonts/archivo/600SemiBold/Archivo_600SemiBold.ttf");
-const Archivo_700Bold = require("@expo-google-fonts/archivo/700Bold/Archivo_700Bold.ttf");
-const Archivo_800ExtraBold = require("@expo-google-fonts/archivo/800ExtraBold/Archivo_800ExtraBold.ttf");
-const Archivo_900Black = require("@expo-google-fonts/archivo/900Black/Archivo_900Black.ttf");
+// Atkinson Hyperlegible Next (Braille Institute, OFL): letters that can't be mistaken for each other.
+// Barlow Condensed for scores and kick-off times — the scoreboard look.
+const AtkinsonHyperlegibleNext_400Regular = require("@expo-google-fonts/atkinson-hyperlegible-next/400Regular/AtkinsonHyperlegibleNext_400Regular.ttf");
+const AtkinsonHyperlegibleNext_500Medium = require("@expo-google-fonts/atkinson-hyperlegible-next/500Medium/AtkinsonHyperlegibleNext_500Medium.ttf");
+const AtkinsonHyperlegibleNext_600SemiBold = require("@expo-google-fonts/atkinson-hyperlegible-next/600SemiBold/AtkinsonHyperlegibleNext_600SemiBold.ttf");
+const AtkinsonHyperlegibleNext_700Bold = require("@expo-google-fonts/atkinson-hyperlegible-next/700Bold/AtkinsonHyperlegibleNext_700Bold.ttf");
+const AtkinsonHyperlegibleNext_800ExtraBold = require("@expo-google-fonts/atkinson-hyperlegible-next/800ExtraBold/AtkinsonHyperlegibleNext_800ExtraBold.ttf");
+const BarlowCondensed_700Bold = require("@expo-google-fonts/barlow-condensed/700Bold/BarlowCondensed_700Bold.ttf");
 
+// PSL matchday palette (navy + Castle gold). Names kept from v1 so every screen picks it up.
+// red = main brand colour (now PSL royal navy), redDark = deep navy, gold = Castle gold accent.
 const C = {
-  red: "#6C2BEA",
-  redDark: "#2D0A45",
-  ink: "#17131D",
-  cream: "#F3F1F6",
+  red: "#13306E",
+  redDark: "#0B1F4B",
+  ink: "#14181F",
+  cream: "#FBF8F1",
   white: "#FFFFFF",
-  muted: "#6D6575",
-  line: "#DED8E6",
-  green: "#168A53",
-  gold: "#B9F34A",
-  shell: "#120819",
-  shellRaised: "#24122D",
-  shellLine: "#35213F",
-  shellMuted: "#9F91A8",
+  muted: "#4A5363",
+  line: "#D9D4C7",
+  green: "#1E7B3C",
+  gold: "#E5B611",
+  danger: "#B3121F",
+  shell: "#071433",
+  shellRaised: "#13306E",
+  shellLine: "#1F3B7A",
+  shellMuted: "#A9B4CC",
 };
 const F = {
-  regular: "Archivo_400Regular",
-  medium: "Archivo_500Medium",
-  semibold: "Archivo_600SemiBold",
-  bold: "Archivo_700Bold",
-  extra: "Archivo_800ExtraBold",
-  black: "Archivo_900Black",
+  regular: "AtkinsonHyperlegibleNext_400Regular",
+  medium: "AtkinsonHyperlegibleNext_500Medium",
+  semibold: "AtkinsonHyperlegibleNext_600SemiBold",
+  bold: "AtkinsonHyperlegibleNext_700Bold",
+  extra: "AtkinsonHyperlegibleNext_800ExtraBold",
+  black: "AtkinsonHyperlegibleNext_800ExtraBold",
+  score: "BarlowCondensed_700Bold",
 };
 
-function AppText({ style, ...props }) {
-  return <Text {...props} style={[{ fontFamily: F.regular }, style]} />;
+// Every label in the app goes through AppText, so this is where the app becomes easier to read:
+// no text smaller than 14px, no ALL CAPS, the chosen language, and optional bigger text.
+function AppText({ style, children, maxSize, ...props }) {
+  const { lang, big } = useUiPrefs();
+  const flat = StyleSheet.flatten(style) || {};
+  const size = Math.min(readableSize(flat.fontSize, big), maxSize || 999);
+  const fix = { fontSize: size };
+  if (flat.lineHeight && flat.fontSize) fix.lineHeight = Math.round((flat.lineHeight * size) / flat.fontSize);
+  else if (flat.lineHeight && flat.lineHeight < size * 1.15) fix.lineHeight = Math.round(size * 1.3);
+  if (flat.letterSpacing && flat.letterSpacing > 0.6) fix.letterSpacing = 0.3;
+  if (flat.textTransform === "uppercase") fix.textTransform = "none";
+  const shown = typeof children === "string" ? displayText(children, lang) : children;
+  return (
+    <Text {...props} style={[{ fontFamily: F.regular }, style, fix]}>
+      {shown}
+    </Text>
+  );
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -1575,24 +1599,101 @@ function TeamBadge({ name, onPress, size = 38 }) {
     badge
   );
 }
+// Big yellow "listen" button + language button on every main screen.
+function ListenButton({ text, helpKey, dark = true }) {
+  const { lang } = useUiPrefs();
+  const [on, setOn] = useState(false);
+  useEffect(() => () => stopSpeaking(), []);
+  const say = () => {
+    if (on) {
+      stopSpeaking();
+      setOn(false);
+      return;
+    }
+    const help = SCREEN_HELP[helpKey]?.[lang] || SCREEN_HELP[helpKey]?.en;
+    const spoken = help || displayText(text, lang);
+    setOn(true);
+    speakText(spoken, lang, { onDone: () => setOn(false) });
+  };
+  return (
+    <MotionPressable
+      onPress={say}
+      style={[s.listenButton, on && s.listenButtonOn, !dark && { borderColor: C.line }]}
+      accessibilityRole="button"
+      accessibilityLabel={translate("listen", lang) || "Listen"}
+    >
+      <Ionicons name={on ? "stop" : "volume-high"} size={24} color={C.redDark} />
+    </MotionPressable>
+  );
+}
+
+function LanguageSheet({ visible, close }) {
+  const { lang, setLang, big, setBig } = useUiPrefs();
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+      <Pressable style={s.langScrim} onPress={close} accessibilityLabel="Close">
+        <Pressable style={s.langSheet} onPress={() => {}}>
+          <AppText style={s.langTitle}>Language</AppText>
+          {LANGS.map((l) => (
+            <MotionPressable
+              key={l.id}
+              onPress={() => setLang(l.id)}
+              style={[s.langOption, lang === l.id && s.langOptionOn]}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: lang === l.id }}
+            >
+              <AppText style={s.langOptionText}>{l.label}</AppText>
+              {lang === l.id ? <Ionicons name="checkmark-circle" size={28} color={C.redDark} /> : null}
+            </MotionPressable>
+          ))}
+          <MotionPressable
+            onPress={() => setBig(!big)}
+            style={[s.langOption, big && s.langOptionOn]}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: big }}
+          >
+            <AppText style={s.langOptionText}>A+  Bigger text</AppText>
+            {big ? <Ionicons name="checkmark-circle" size={28} color={C.redDark} /> : null}
+          </MotionPressable>
+          <View style={s.safeNote}>
+            <Ionicons name="shield-checkmark" size={22} color={C.green} />
+            <AppText style={s.safeNoteText}>This app never asks for your EcoCash PIN.</AppText>
+          </View>
+          <MotionPressable onPress={close} style={s.langDone} accessibilityRole="button">
+            <AppText style={s.langDoneText}>Done</AppText>
+          </MotionPressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function BrandHeader({
   title = "GRASSROOTS",
   notificationCount = 0,
   onNotifications,
 }) {
+  const [langOpen, setLangOpen] = useState(false);
+  const { lang } = useUiPrefs();
+  const helpKey = String(title).toLowerCase();
   return (
     <View style={s.header}>
       <View style={s.friendliesMark}>
         <AppText style={s.friendliesMarkText}>F</AppText>
       </View>
       <View style={{ flex: 1 }}>
-        <AppText style={s.brandHeaderTitle}>{title}</AppText>
-        <AppText style={s.brandHeaderSub}>GRASSROOTS FOOTBALL · ZIMBABWE</AppText>
+        <AppText style={s.brandHeaderTitle} numberOfLines={1} maxSize={21}>{title}</AppText>
+        <AppText style={s.brandHeaderSub} numberOfLines={1} maxSize={15}>Zimbabwe</AppText>
       </View>
-      <View style={s.headerNetworkState}>
-        <View style={s.headerNetworkDot} />
-        <AppText style={s.headerNetworkText}>LIVE</AppText>
-      </View>
+      <MotionPressable
+        onPress={() => setLangOpen(true)}
+        style={s.headerLang}
+        accessibilityRole="button"
+        accessibilityLabel="Language and text size"
+      >
+        <AppText style={s.headerLangText}>{lang.toUpperCase()}</AppText>
+      </MotionPressable>
+      <ListenButton text={title} helpKey={helpKey} />
       <MotionPressable
         onPress={onNotifications}
         disabled={!onNotifications}
@@ -1604,7 +1705,7 @@ function BrandHeader({
             : "Notifications"
         }
       >
-        <Ionicons name="notifications-outline" size={22} color={C.white} />
+        <Ionicons name="notifications-outline" size={24} color={C.white} />
         {notificationCount ? (
           <View style={s.headerBellBadge}>
             <AppText style={s.headerBellBadgeText}>
@@ -1613,6 +1714,7 @@ function BrandHeader({
           </View>
         ) : null}
       </MotionPressable>
+      <LanguageSheet visible={langOpen} close={() => setLangOpen(false)} />
     </View>
   );
 }
@@ -4256,10 +4358,6 @@ function CommunityHome({
                 {hasTeam ? team.area : "Your football space is ready"}
               </AppText>
             </View>
-            <View style={s.readyPill}>
-              <View style={s.readyDot} />
-              <AppText style={s.readyText}>MATCH NETWORK</AppText>
-            </View>
           </View>
           <AppText style={s.communityWelcomeTitle}>
             {hasTeam ? "Build the next match." : "Start with your first team."}
@@ -4614,7 +4712,7 @@ function TeamHub({
                 value={name}
                 onChangeText={setName}
                 placeholder="Enter the team name"
-                placeholderTextColor="#756D7D"
+                placeholderTextColor="#4A5363"
                 style={s.formInput}
               />
               <AppText style={s.formLabel}>Home area</AppText>
@@ -4622,7 +4720,7 @@ function TeamHub({
                 value={area}
                 onChangeText={setArea}
                 placeholder="Town, suburb or district"
-                placeholderTextColor="#756D7D"
+                placeholderTextColor="#4A5363"
                 style={s.formInput}
               />
               {error ? (
@@ -5612,6 +5710,17 @@ function MatchFlowScreen({ match, close, finish, onSaved }) {
   );
 }
 
+// Free WhatsApp sharing (wa.me link) — no WhatsApp API, no cost. The person picks the group.
+function shareMatchOnWhatsApp(match, home, away) {
+  const lines = [
+    `⚽ ${home?.name || match.homeTeamName || "Home"} vs ${away?.name || match.awayTeamName || "Away"}`,
+    `📅 ${formatStoredDate(match.matchDate)}${match.kickoff ? ` · ${match.kickoff}` : ""}`,
+    match.venue ? `📍 ${match.venue}` : null,
+    "Reply 👍 if you are coming, 👎 if you can't. — Grassroots",
+  ].filter(Boolean);
+  Linking.openURL(`https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`).catch(() => {});
+}
+
 function UpcomingMatchCard({
   match,
   teams,
@@ -5757,7 +5866,24 @@ function UpcomingMatchCard({
           </View>
         </View>
       </View>
+      {Number(match.teamFee || 0) > 0 || Number(match.refereeFee || match.proposedRefereeFee || 0) > 0 ? (
+        <View style={[s.safeNote, { marginTop: 10 }]}>
+          <Ionicons name="shield-checkmark" size={20} color={C.green} />
+          <AppText style={s.safeNoteText}>
+            Pay cash or EcoCash yourself. This app never takes money and never asks for a PIN.
+          </AppText>
+        </View>
+      ) : null}
       <View style={[s.upcomingActions, compact && s.actionsCompact]}>
+        <Pressable
+          style={s.whatsAppButton}
+          onPress={() => shareMatchOnWhatsApp(match, home, away)}
+          accessibilityRole="button"
+          accessibilityLabel="Share on WhatsApp"
+        >
+          <Ionicons name="logo-whatsapp" size={22} color={C.white} />
+          <AppText style={s.whatsAppButtonText}>Share on WhatsApp</AppText>
+        </Pressable>
         {onOpenMatch ? (
           <Pressable style={s.upcomingChatButton} onPress={onOpenMatch}>
             <Ionicons name="football-outline" size={17} color={C.redDark} />
@@ -10019,7 +10145,7 @@ function Community({
                 <View style={{ flex: 1 }}>
                   <Label>YOUR TEAM</Label>
                   <AppText style={s.h2White}>{team.name}</AppText>
-                  <AppText style={[s.meta, { color: "#D7C8E6" }]}>
+                  <AppText style={[s.meta, { color: "#CAD2E4" }]}>
                     {team.area || "No home area added"}
                   </AppText>
                 </View>
@@ -12022,6 +12148,8 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
   const [locating, setLocating] = useState(false);
   const [locationMessage, setLocationMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+  // Optional extras stay folded away so the required questions and the Create button come first.
+  const [showMore, setShowMore] = useState(false);
   const saveLock = useRef(false);
   const area = teamLocationLabel(location);
   const selectedBadgeColor = badgeColor;
@@ -12306,6 +12434,8 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
         <AppText style={s.formHelp}>
           Friendlies, rankings and competition entry use this category.
         </AppText>
+        {showMore ? (
+          <>
         <AppText style={s.formLabel}>Kit sponsor</AppText>
         <TextInput
           value={sponsor}
@@ -12322,7 +12452,22 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
           placeholder="Coach or manager"
           placeholderTextColor={C.muted}
         />
+          </>
+        ) : null}
       </View>
+      <Pressable
+        onPress={() => setShowMore(!showMore)}
+        style={s.moreOptionsToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showMore }}
+      >
+        <Ionicons name={showMore ? "chevron-up" : "options-outline"} size={22} color={C.redDark} />
+        <AppText style={s.moreOptionsText}>
+          {showMore ? "Hide extra options" : "More options (badge, kits, map) — optional"}
+        </AppText>
+      </Pressable>
+      {showMore ? (
+        <>
       <View style={s.formSection}>
         <AppText style={s.formSectionTitle}>Badge designer</AppText>
         <AppText style={s.formLabel}>Shape</AppText>
@@ -12491,6 +12636,8 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
           </Pressable>
         ))}
       </View>
+        </>
+      ) : null}
       <View style={s.formFooter}>
         {saveError ? (
           <AppText style={s.authErrorText}>{saveError}</AppText>
@@ -13558,7 +13705,7 @@ function DayTournamentView({
             {twoDays ? "Day 1" : "Morning"}
           </AppText>
           <AppText style={[s.team, { color: C.white }]}>Group matches</AppText>
-          <AppText style={[s.meta, { color: "#D8CDE1" }]}>
+          <AppText style={[s.meta, { color: "#CFD4DF" }]}>
             Every team gets an opening game
           </AppText>
         </View>
@@ -13569,7 +13716,7 @@ function DayTournamentView({
           <AppText style={[s.team, { color: C.white }]}>
             Knockout matches
           </AppText>
-          <AppText style={[s.meta, { color: "#D8CDE1" }]}>
+          <AppText style={[s.meta, { color: "#CFD4DF" }]}>
             Qualifiers play through to the final
           </AppText>
         </View>
@@ -13642,7 +13789,7 @@ function TournamentResultsPanel({
             <AppText style={s.championLabel}>CHAMPIONS</AppText>
             <AppText style={s.championName}>{winner.name}</AppText>
             {runnerUp ? (
-              <AppText style={[s.meta, { color: "#D9CFE2" }]}>
+              <AppText style={[s.meta, { color: "#D0D5E1" }]}>
                 Runners up · {runnerUp.name}
               </AppText>
             ) : null}
@@ -15700,7 +15847,7 @@ function RoleToolScreen({
             </View>
           ) : null}
           <View style={s.reportMatch}>
-            <AppText style={[s.meta, { color: "#D7C8E6" }]}>
+            <AppText style={[s.meta, { color: "#CAD2E4" }]}>
               HARARE SOCIAL LEAGUE · FINAL
             </AppText>
             <AppText
@@ -18062,7 +18209,7 @@ function AuthGateway({
                 onChangeText={setName}
                 style={s.authInput}
                 placeholder="e.g. Taku Nhamo"
-                placeholderTextColor="#756D7D"
+                placeholderTextColor="#4A5363"
                 textContentType="name"
                 autoCapitalize="words"
               />
@@ -18083,7 +18230,7 @@ function AuthGateway({
                 onChangeText={setPhoneNumber}
                 style={s.authInput}
                 placeholder="077 123 4567"
-                placeholderTextColor="#756D7D"
+                placeholderTextColor="#4A5363"
                 keyboardType="phone-pad"
                 textContentType="telephoneNumber"
                 autoComplete="tel"
@@ -18098,13 +18245,19 @@ function AuthGateway({
               onChangeText={setEmail}
               style={s.authInput}
               placeholder="you@example.com"
-              placeholderTextColor="#756D7D"
+              placeholderTextColor="#4A5363"
               keyboardType="email-address"
               textContentType="emailAddress"
               autoCapitalize="none"
               autoCorrect={false}
             />
           )}
+          <View style={[s.safeNote, { marginTop: 14 }]}>
+            <Ionicons name="shield-checkmark" size={22} color={C.green} />
+            <AppText style={s.safeNoteText}>
+              Never use your EcoCash PIN as your password. This app will never ask for it.
+            </AppText>
+          </View>
           <AppText style={s.authFieldLabel}>Password</AppText>
           <View style={s.authPasswordField}>
             <TextInput
@@ -18112,7 +18265,7 @@ function AuthGateway({
               onChangeText={setPassword}
               style={s.authPasswordInput}
               placeholder="At least 8 characters"
-              placeholderTextColor="#756D7D"
+              placeholderTextColor="#4A5363"
               secureTextEntry={!showPassword}
               textContentType={isSignup ? "newPassword" : "password"}
               autoCapitalize="none"
@@ -19224,7 +19377,7 @@ function CoachProfile({ data, update, onSave, saving = false, saved = false }) {
           value={data.name}
           onChangeText={(name) => update({ name })}
           placeholder="Your name"
-          placeholderTextColor="#756D7D"
+          placeholderTextColor="#4A5363"
           style={s.formInput}
         />
         <AppText style={s.formLabel}>Coaching qualification</AppText>
@@ -19232,7 +19385,7 @@ function CoachProfile({ data, update, onSave, saving = false, saved = false }) {
           value={data.qualification}
           onChangeText={(qualification) => update({ qualification })}
           placeholder="Licence or coaching level"
-          placeholderTextColor="#756D7D"
+          placeholderTextColor="#4A5363"
           style={s.formInput}
         />
         <FormLabel required>Area</FormLabel>
@@ -19240,7 +19393,7 @@ function CoachProfile({ data, update, onSave, saving = false, saved = false }) {
           value={data.area}
           onChangeText={(area) => update({ area })}
           placeholder="Town, suburb or district"
-          placeholderTextColor="#756D7D"
+          placeholderTextColor="#4A5363"
           style={s.formInput}
         />
         <AppText style={s.formLabel}>Coaching summary</AppText>
@@ -19248,7 +19401,7 @@ function CoachProfile({ data, update, onSave, saving = false, saved = false }) {
           value={data.bio}
           onChangeText={(bio) => update({ bio })}
           placeholder="Your experience and the football you coach"
-          placeholderTextColor="#756D7D"
+          placeholderTextColor="#4A5363"
           multiline
           style={[s.formInput, s.profileMultiline]}
         />
@@ -20159,7 +20312,7 @@ function PlayerAppearanceEntry({ data, update, close }) {
               setSubmitted(false);
             }}
             placeholder="e.g. Mbare City Boys"
-            placeholderTextColor="#756D7D"
+            placeholderTextColor="#4A5363"
             style={s.formInput}
           />
           <AppText style={s.formLabel}>When did you play?</AppText>
@@ -21890,12 +22043,12 @@ function App() {
   const [ready, setReady] = useState(false);
   const [startupTimedOut, setStartupTimedOut] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
-    Archivo_400Regular,
-    Archivo_500Medium,
-    Archivo_600SemiBold,
-    Archivo_700Bold,
-    Archivo_800ExtraBold,
-    Archivo_900Black,
+    AtkinsonHyperlegibleNext_400Regular,
+    AtkinsonHyperlegibleNext_500Medium,
+    AtkinsonHyperlegibleNext_600SemiBold,
+    AtkinsonHyperlegibleNext_700Bold,
+    AtkinsonHyperlegibleNext_800ExtraBold,
+    BarlowCondensed_700Bold,
   });
   useEffect(() => {
     if (reducedMotion) {
@@ -23459,6 +23612,9 @@ function App() {
                 />
               )}
               <AppText
+                maxSize={14}
+                numberOfLines={1}
+                adjustsFontSizeToFit
                 style={[
                   s.navText,
                   active && s.navTextActive,
@@ -23476,7 +23632,94 @@ function App() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F4F1F6" },
+  moreOptionsToggle: {
+    minHeight: 58,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: C.line,
+    backgroundColor: C.white,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+  },
+  moreOptionsText: { flex: 1, color: C.redDark, fontSize: 16, fontFamily: F.bold },
+  listenButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: C.gold,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listenButtonOn: { backgroundColor: C.white },
+  headerLang: {
+    minWidth: 48,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: C.shellLine,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  headerLangText: { color: C.white, fontSize: 15, fontFamily: F.bold },
+  langScrim: { flex: 1, backgroundColor: "rgba(7,20,51,0.6)", justifyContent: "flex-end" },
+  langSheet: {
+    backgroundColor: C.cream,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 20,
+    paddingBottom: 34,
+    gap: 12,
+  },
+  langTitle: { fontSize: 24, fontFamily: F.extra, color: C.redDark, marginBottom: 4 },
+  langOption: {
+    minHeight: 62,
+    borderRadius: 16,
+    borderWidth: 3,
+    borderColor: C.line,
+    backgroundColor: C.white,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  langOptionOn: { borderColor: C.redDark, backgroundColor: "#FFF4CC" },
+  langOptionText: { fontSize: 19, fontFamily: F.bold, color: C.redDark },
+  langDone: {
+    minHeight: 58,
+    borderRadius: 16,
+    backgroundColor: C.gold,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  langDoneText: { fontSize: 19, fontFamily: F.extra, color: C.redDark },
+  safeNote: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    backgroundColor: "#E9F3EC",
+    borderRadius: 14,
+    padding: 12,
+  },
+  safeNoteText: { flex: 1, color: "#12512A", fontSize: 15, fontFamily: F.bold },
+  whatsAppButton: {
+    flex: 1,
+    minWidth: 118,
+    minHeight: 52,
+    borderRadius: 10,
+    backgroundColor: C.green,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  whatsAppButtonText: { color: C.white, fontSize: 15, fontFamily: F.bold },
+  safe: { flex: 1, backgroundColor: C.cream },
   screenStage: { flex: 1 },
   header: {
     minHeight: 76,
@@ -23516,7 +23759,7 @@ const s = StyleSheet.create({
     letterSpacing: -0.35,
   },
   brandHeaderSub: {
-    color: "#BFAFCA",
+    color: "#B1B8C8",
     fontSize: 8,
     letterSpacing: 0.8,
     fontFamily: F.semibold,
@@ -23569,7 +23812,7 @@ const s = StyleSheet.create({
     fontSize: 48,
     lineHeight: 44,
     color: "white",
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -1.8,
     marginVertical: 10,
   },
@@ -23683,7 +23926,7 @@ const s = StyleSheet.create({
   liveScore: {
     color: C.ink,
     fontSize: 18,
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
   },
   liveScoreActiveText: { color: C.white },
@@ -24231,11 +24474,11 @@ const s = StyleSheet.create({
     color: C.white,
     fontSize: 35,
     lineHeight: 38,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -1.1,
   },
   loaderSub: {
-    color: "#F3EEF8",
+    color: "#F0F2F6",
     fontSize: 10,
     lineHeight: 14,
     fontFamily: F.bold,
@@ -24261,7 +24504,7 @@ const s = StyleSheet.create({
   seasonTitle: {
     fontSize: 40,
     lineHeight: 44,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -1.2,
     color: "white",
     paddingHorizontal: 18,
@@ -24351,7 +24594,7 @@ const s = StyleSheet.create({
   },
   clubHeroTitle: {
     fontSize: 30,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -0.7,
     marginTop: 12,
   },
@@ -24490,7 +24733,7 @@ const s = StyleSheet.create({
   },
   kickoffText: {
     fontSize: 24,
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
     color: C.ink,
   },
@@ -24758,7 +25001,7 @@ const s = StyleSheet.create({
     width: 58,
     textAlign: "center",
     fontSize: 15,
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
   },
   featureGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -24816,7 +25059,7 @@ const s = StyleSheet.create({
   fantasyModeText: { color: "white", fontWeight: "800", fontSize: 12 },
   fantasyHeroCopy: { paddingTop: 24 },
   fantasyHeroTitle: { color: "white", fontSize: 38, fontWeight: "900" },
-  fantasyHeroBody: { color: "#E8D9FF", fontSize: 12, marginTop: 4 },
+  fantasyHeroBody: { color: "#E5E9F3", fontSize: 12, marginTop: 4 },
   managerLine: {
     marginTop: 22,
     paddingVertical: 16,
@@ -24881,7 +25124,7 @@ const s = StyleSheet.create({
     marginTop: 16,
   },
   fantasyInfoCopy: {
-    color: "#E8D9FF",
+    color: "#E5E9F3",
     fontSize: 12,
     lineHeight: 18,
     marginTop: 6,
@@ -25130,7 +25373,7 @@ const s = StyleSheet.create({
     color: "white",
     fontSize: 31,
     lineHeight: 31,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -0.9,
   },
   playerClubLine: {
@@ -25264,11 +25507,11 @@ const s = StyleSheet.create({
     marginTop: 10,
   },
   communityNarrowVenue: { flex: 1, color: C.muted, fontSize: 11 },
-  communityFixturePressed: { backgroundColor: "#F7F4FA" },
+  communityFixturePressed: { backgroundColor: "#F5F6F9" },
   communityTimeBlock: { width: 48, alignItems: "center" },
   communityTime: {
     fontSize: 15,
-    fontFamily: F.black,
+    fontFamily: F.score,
     color: C.ink,
     fontVariant: ["tabular-nums"],
   },
@@ -25332,7 +25575,7 @@ const s = StyleSheet.create({
   matchSheetKickoff: { alignItems: "center" },
   matchSheetTime: {
     fontSize: 25,
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
   },
   matchSheetVenue: {
@@ -25361,7 +25604,7 @@ const s = StyleSheet.create({
   },
   communityWelcomeShade: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(12, 4, 18, 0.74)",
+    backgroundColor: "rgba(5, 13, 35, 0.74)",
   },
   communityWelcomeTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   homeTeamBadge: {
@@ -25376,7 +25619,7 @@ const s = StyleSheet.create({
   },
   homeTeamBadgeText: { color: "white", fontSize: 12, fontFamily: F.black },
   homeGreeting: { color: "white", fontSize: 13, fontFamily: F.bold },
-  homeTeamMeta: { color: "#CDBED8", fontSize: 9, marginTop: 3 },
+  homeTeamMeta: { color: "#C0C7D6", fontSize: 9, marginTop: 3 },
   readyPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -25392,13 +25635,13 @@ const s = StyleSheet.create({
     color: "white",
     fontSize: 34,
     lineHeight: 36,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -1.1,
     marginTop: 34,
     maxWidth: 320,
   },
   communityWelcomeBody: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 13,
     lineHeight: 19,
     marginTop: 10,
@@ -25569,8 +25812,8 @@ const s = StyleSheet.create({
   },
   upcomingTime: {
     color: C.ink,
-    fontSize: 16,
-    fontFamily: F.black,
+    fontSize: 30,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
   },
   upcomingVs: {
@@ -25590,7 +25833,7 @@ const s = StyleSheet.create({
     borderRadius: 11,
     flexDirection: "row",
     gap: 10,
-    backgroundColor: "#F7F4F8",
+    backgroundColor: "#F5F6F7",
   },
   upcomingAgreementItem: {
     flex: 1,
@@ -25664,7 +25907,7 @@ const s = StyleSheet.create({
   screenTitle: {
     fontSize: 32,
     lineHeight: 36,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -0.7,
     color: C.ink,
     marginBottom: 5,
@@ -25676,7 +25919,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     padding: 4,
     borderRadius: 9,
-    backgroundColor: "#E6E0EA",
+    backgroundColor: "#E2E4E8",
     gap: 3,
   },
   communitySegment: {
@@ -25789,7 +26032,7 @@ const s = StyleSheet.create({
   resultScore: {
     fontSize: 17,
     lineHeight: 23,
-    fontFamily: F.black,
+    fontFamily: F.score,
     textAlign: "center",
     fontVariant: ["tabular-nums"],
   },
@@ -25813,12 +26056,12 @@ const s = StyleSheet.create({
   },
   squadCrestText: { color: "white", fontSize: 17, fontFamily: F.black },
   squadTeamName: { color: "white", fontSize: 18, fontFamily: F.black },
-  squadTeamMeta: { color: "#D7C8E6", fontSize: 9, marginTop: 4 },
+  squadTeamMeta: { color: "#CAD2E4", fontSize: 9, marginTop: 4 },
   squadStats: {
     flexDirection: "row",
     justifyContent: "space-around",
     borderTopWidth: 1,
-    borderColor: "#5D3478",
+    borderColor: "#394A73",
     marginTop: 18,
     paddingTop: 16,
   },
@@ -25829,7 +26072,7 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
   squadStatLabel: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 8,
     fontFamily: F.bold,
     marginTop: 2,
@@ -25889,7 +26132,7 @@ const s = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -25936,7 +26179,7 @@ const s = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 12,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -26202,7 +26445,7 @@ const s = StyleSheet.create({
     color: C.ink,
     paddingHorizontal: 12,
     fontFamily: F.medium,
-    fontSize: 12,
+    fontSize: 17,
   },
   dropdownField: {
     minHeight: 50,
@@ -26216,7 +26459,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
-  dropdownFieldDisabled: { backgroundColor: "#ECE8F0" },
+  dropdownFieldDisabled: { backgroundColor: "#EAEBEE" },
   dropdownValue: {
     flex: 1,
     color: C.ink,
@@ -26266,7 +26509,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: C.line,
-    backgroundColor: "#F7F5F8",
+    backgroundColor: "#F6F6F7",
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
@@ -26276,7 +26519,7 @@ const s = StyleSheet.create({
     minHeight: 48,
     color: C.ink,
     fontFamily: F.medium,
-    fontSize: 14,
+    fontSize: 17,
   },
   dropdownOptions: { flexGrow: 0 },
   dropdownEmpty: {
@@ -26295,7 +26538,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: C.line,
   },
-  dropdownOptionSelected: { backgroundColor: "#EEE8F6" },
+  dropdownOptionSelected: { backgroundColor: "#EBEDF3" },
   dropdownOptionText: {
     flex: 1,
     color: C.ink,
@@ -26311,7 +26554,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: C.line,
-    backgroundColor: "#F3EEF8",
+    backgroundColor: "#F0F2F6",
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -26324,7 +26567,7 @@ const s = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
     overflow: "hidden",
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     color: C.redDark,
     fontSize: 9,
     fontFamily: F.bold,
@@ -26350,7 +26593,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     borderRadius: 11,
     marginTop: 14,
   },
@@ -26383,7 +26626,7 @@ const s = StyleSheet.create({
   moneyTextInput: {
     flex: 1,
     color: C.ink,
-    fontSize: 13,
+    fontSize: 17,
     fontFamily: F.bold,
     paddingLeft: 6,
   },
@@ -26468,7 +26711,7 @@ const s = StyleSheet.create({
     borderColor: "#FFFFFF88",
   },
   teamCreatorName: { color: "white", fontSize: 16, fontFamily: F.black },
-  teamCreatorMeta: { color: "#D7C8E6", fontSize: 8, marginTop: 4 },
+  teamCreatorMeta: { color: "#CAD2E4", fontSize: 8, marginTop: 4 },
   teamCreatorCoach: {
     color: C.gold,
     fontSize: 8,
@@ -26613,7 +26856,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 12,
     borderRadius: 10,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
   },
   liveLocationMessage: {
     color: C.redDark,
@@ -26656,7 +26899,7 @@ const s = StyleSheet.create({
     gap: 12,
   },
   roleCardActive: {
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     marginHorizontal: -8,
     paddingHorizontal: 8,
     borderRadius: 11,
@@ -26667,7 +26910,7 @@ const s = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 12,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -26694,7 +26937,7 @@ const s = StyleSheet.create({
     fontFamily: F.black,
     marginTop: 12,
   },
-  operationMeta: { color: "#D7C8E6", fontSize: 9, marginTop: 12 },
+  operationMeta: { color: "#CAD2E4", fontSize: 9, marginTop: 12 },
   operationScore: {
     width: 54,
     height: 54,
@@ -26704,7 +26947,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  operationScoreValue: { color: "white", fontSize: 15, fontFamily: F.black },
+  operationScoreValue: { color: "white", fontSize: 15, fontFamily: F.score },
   operationScoreLabel: { color: C.gold, fontSize: 6, fontFamily: F.bold },
   checklistRow: {
     minHeight: 72,
@@ -26739,7 +26982,7 @@ const s = StyleSheet.create({
     backgroundColor: C.redDark,
   },
   walletLabel: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 8,
     fontFamily: F.bold,
     letterSpacing: 0.8,
@@ -26747,7 +26990,7 @@ const s = StyleSheet.create({
   walletBalance: {
     color: "white",
     fontSize: 38,
-    fontFamily: F.black,
+    fontFamily: F.score,
     marginTop: 8,
     fontVariant: ["tabular-nums"],
   },
@@ -26755,7 +26998,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     borderTopWidth: 1,
-    borderColor: "#5D3478",
+    borderColor: "#394A73",
     paddingTop: 16,
     marginTop: 20,
   },
@@ -26766,7 +27009,7 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
   walletMiniLabel: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 7,
     fontFamily: F.bold,
     marginTop: 3,
@@ -26776,7 +27019,7 @@ const s = StyleSheet.create({
     flex: 1,
     minHeight: 74,
     borderRadius: 10,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
@@ -26833,7 +27076,7 @@ const s = StyleSheet.create({
     minWidth: 0,
     minHeight: 48,
     color: C.ink,
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: F.medium,
   },
   inviteResultRow: {
@@ -26850,13 +27093,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 8,
     borderBottomColor: "transparent",
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
   },
   inviteAvatar: {
     width: 52,
     height: 52,
     borderRadius: 10,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
   },
   inviteAvatarFallback: {
     width: 52,
@@ -26891,7 +27134,7 @@ const s = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 14,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 14,
@@ -26917,7 +27160,7 @@ const s = StyleSheet.create({
   },
   playerIdentityInitials: { color: "white", fontSize: 19, fontFamily: F.black },
   playerIdentityName: { color: "white", fontSize: 18, fontFamily: F.black },
-  playerIdentityMeta: { color: "#D7C8E6", fontSize: 9, marginTop: 4 },
+  playerIdentityMeta: { color: "#CAD2E4", fontSize: 9, marginTop: 4 },
   verifiedLine: {
     flexDirection: "row",
     alignItems: "center",
@@ -26944,7 +27187,7 @@ const s = StyleSheet.create({
     minHeight: 78,
     borderRadius: 12,
     padding: 14,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -26970,7 +27213,7 @@ const s = StyleSheet.create({
   fitSummary: {
     minHeight: 58,
     borderRadius: 11,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     paddingHorizontal: 13,
     flexDirection: "row",
     alignItems: "center",
@@ -27041,7 +27284,7 @@ const s = StyleSheet.create({
     backgroundColor: "white",
     color: C.ink,
     fontSize: 28,
-    fontFamily: F.black,
+    fontFamily: F.score,
     textAlign: "center",
   },
   reportDash: { color: "white", fontSize: 24, fontFamily: F.black },
@@ -27075,9 +27318,9 @@ const s = StyleSheet.create({
     color: C.ink,
     textAlign: "center",
     fontSize: 26,
-    fontFamily: F.black,
+    fontFamily: F.score,
   },
-  wizardScoreDivider: { color: C.muted, fontSize: 24, fontFamily: F.black },
+  wizardScoreDivider: { color: C.muted, fontSize: 24, fontFamily: F.score },
   playerPicker: { gap: 7, paddingVertical: 3 },
   playerPickerChip: {
     minWidth: 76,
@@ -27099,7 +27342,7 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -27150,11 +27393,11 @@ const s = StyleSheet.create({
     fontFamily: F.bold,
     textAlign: "center",
   },
-  reviewScoreValue: { color: C.gold, fontSize: 24, fontFamily: F.black },
+  reviewScoreValue: { color: C.gold, fontSize: 24, fontFamily: F.score },
   statsNotice: {
     minHeight: 74,
     borderRadius: 4,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     padding: 13,
     flexDirection: "row",
     alignItems: "center",
@@ -27180,7 +27423,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 11,
   },
-  recordButtonMeta: { color: "#E8D9FF", fontSize: 8, marginTop: 3 },
+  recordButtonMeta: { color: "#E5E9F3", fontSize: 8, marginTop: 3 },
   teamDiscoveryRow: {
     minHeight: 88,
     flexDirection: "row",
@@ -27273,7 +27516,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   reviewScorer: {
-    color: "#E8D9FF",
+    color: "#E5E9F3",
     fontSize: 8,
     lineHeight: 12,
     fontFamily: F.medium,
@@ -27336,7 +27579,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 5,
   },
-  crestShapeChoiceActive: { borderColor: C.red, backgroundColor: "#EEE8F6" },
+  crestShapeChoiceActive: { borderColor: C.red, backgroundColor: "#EBEDF3" },
   chatBubble: {
     alignSelf: "flex-start",
     maxWidth: "82%",
@@ -27429,7 +27672,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     padding: 8,
   },
-  kitSlotActive: { borderColor: C.red, backgroundColor: "#EEE8F6" },
+  kitSlotActive: { borderColor: C.red, backgroundColor: "#EBEDF3" },
   kitEditor: {
     borderTopWidth: 1,
     borderColor: C.line,
@@ -27454,7 +27697,7 @@ const s = StyleSheet.create({
   },
   groundMap: {
     minHeight: 150,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     borderRadius: 4,
     alignItems: "center",
     justifyContent: "center",
@@ -27490,7 +27733,7 @@ const s = StyleSheet.create({
     width: 44,
     height: 48,
     borderRadius: 4,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -27508,7 +27751,7 @@ const s = StyleSheet.create({
   leagueSafety: {
     minHeight: 88,
     borderRadius: 4,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     padding: 13,
     flexDirection: "row",
     alignItems: "center",
@@ -27533,7 +27776,7 @@ const s = StyleSheet.create({
     borderColor: C.line,
     paddingHorizontal: 6,
   },
-  moneyOwnerChoiceActive: { backgroundColor: "#EEE8F6" },
+  moneyOwnerChoiceActive: { backgroundColor: "#EBEDF3" },
   teamProfileHero: {
     minHeight: 128,
     borderRadius: 12,
@@ -27569,7 +27812,7 @@ const s = StyleSheet.create({
     marginTop: 34,
     fontSize: 32,
     letterSpacing: -0.8,
-    fontFamily: F.black,
+    fontFamily: F.score,
     color: C.ink,
   },
   signInCopy: {
@@ -27608,7 +27851,7 @@ const s = StyleSheet.create({
     color: C.white,
     fontSize: 34,
     lineHeight: 37,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -1.25,
   },
   marketingTitleWide: {
@@ -27618,7 +27861,7 @@ const s = StyleSheet.create({
   },
   marketingIntro: {
     maxWidth: 570,
-    color: "#E7DEEE",
+    color: "#E1E4EB",
     fontSize: 16,
     lineHeight: 24,
     marginTop: 13,
@@ -27643,9 +27886,9 @@ const s = StyleSheet.create({
     height: 220,
     overflow: "hidden",
     borderRadius: 20,
-    backgroundColor: "#3B1554",
+    backgroundColor: "#1A2A4F",
     borderWidth: 1,
-    borderColor: "#67447C",
+    borderColor: "#485678",
   },
   marketingHeroImageFrameWide: {
     flex: 1.08,
@@ -27661,7 +27904,7 @@ const s = StyleSheet.create({
     minHeight: 38,
     paddingHorizontal: 12,
     borderRadius: 19,
-    backgroundColor: "rgba(45,10,69,0.88)",
+    backgroundColor: "rgba(11,31,75,0.88)",
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
@@ -27717,7 +27960,7 @@ const s = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 13,
     borderRadius: 22,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     borderWidth: 1,
     borderColor: "transparent",
     flexDirection: "row",
@@ -27810,13 +28053,13 @@ const s = StyleSheet.create({
     color: C.white,
     fontSize: 32,
     lineHeight: 35,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -0.8,
     marginTop: 7,
   },
   marketingSectionIntro: {
     maxWidth: 620,
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 14,
     lineHeight: 21,
     marginTop: 10,
@@ -27828,9 +28071,9 @@ const s = StyleSheet.create({
     minHeight: 200,
     padding: 18,
     borderRadius: 16,
-    backgroundColor: "#3B1554",
+    backgroundColor: "#1A2A4F",
     borderWidth: 1,
-    borderColor: "#5A3371",
+    borderColor: "#38476C",
   },
   marketingStepTop: {
     flexDirection: "row",
@@ -27838,9 +28081,9 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   marketingStepNumber: {
-    color: "#8D6AA2",
+    color: "#6E7C9E",
     fontSize: 28,
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
   },
   marketingStepIcon: {
@@ -27859,7 +28102,7 @@ const s = StyleSheet.create({
     marginTop: 22,
   },
   marketingStepCopy: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,
@@ -27919,9 +28162,9 @@ const s = StyleSheet.create({
     marginTop: 22,
     overflow: "hidden",
     borderRadius: 22,
-    backgroundColor: "#3B1554",
+    backgroundColor: "#1A2A4F",
     borderWidth: 1,
-    borderColor: "#5A3371",
+    borderColor: "#38476C",
   },
   marketingOpportunityWide: {
     minHeight: 440,
@@ -27942,7 +28185,7 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   marketingOpportunityText: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 14,
     lineHeight: 21,
     marginTop: 12,
@@ -27957,7 +28200,7 @@ const s = StyleSheet.create({
     minHeight: 36,
     paddingHorizontal: 11,
     borderRadius: 18,
-    backgroundColor: "#2D0A45",
+    backgroundColor: "#0B1F4B",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -27977,7 +28220,7 @@ const s = StyleSheet.create({
     marginTop: 22,
     padding: 22,
     borderRadius: 22,
-    backgroundColor: "#20102B",
+    backgroundColor: "#121929",
   },
   marketingTrustTitle: {
     color: C.white,
@@ -27997,7 +28240,7 @@ const s = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: 13,
     borderRadius: 12,
-    backgroundColor: "#351944",
+    backgroundColor: "#1C2741",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -28009,19 +28252,19 @@ const s = StyleSheet.create({
   },
   marketingResearchNote: {
     maxWidth: 700,
-    color: "#A994B8",
+    color: "#97A0B5",
     fontSize: 11,
     lineHeight: 16,
     marginTop: 16,
   },
   cinematicWelcome: {
     flexGrow: 1,
-    backgroundColor: "#0B0610",
+    backgroundColor: "#07090F",
   },
   cinematicHero: {
     minHeight: 980,
     overflow: "hidden",
-    backgroundColor: "#0B0610",
+    backgroundColor: "#07090F",
   },
   cinematicHeroWide: { minHeight: 860 },
   cinematicHeroImage: {
@@ -28035,7 +28278,7 @@ const s = StyleSheet.create({
   },
   cinematicImageShade: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10, 4, 15, 0.43)",
+    backgroundColor: "rgba(5, 13, 35, 0.43)",
   },
   cinematicLowerShade: {
     position: "absolute",
@@ -28043,7 +28286,7 @@ const s = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: "58%",
-    backgroundColor: "rgba(10, 4, 15, 0.64)",
+    backgroundColor: "rgba(5, 13, 35, 0.64)",
   },
   cinematicFrame: {
     flex: 1,
@@ -28082,7 +28325,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.2,
   },
   cinematicBrandSub: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 8,
     lineHeight: 11,
     marginTop: 2,
@@ -28145,7 +28388,7 @@ const s = StyleSheet.create({
     color: C.white,
     fontSize: 49,
     lineHeight: 48,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -2.6,
   },
   cinematicTitleWide: {
@@ -28155,7 +28398,7 @@ const s = StyleSheet.create({
   },
   cinematicIntro: {
     maxWidth: 560,
-    color: "#F0EAF4",
+    color: "#ECEEF2",
     fontSize: 15,
     lineHeight: 23,
     marginTop: 18,
@@ -28201,7 +28444,7 @@ const s = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.48)",
-    backgroundColor: "rgba(24,11,32,0.70)",
+    backgroundColor: "rgba(7,20,51,0.70)",
     paddingHorizontal: 13,
     flexDirection: "row",
     alignItems: "center",
@@ -28228,7 +28471,7 @@ const s = StyleSheet.create({
     fontFamily: F.black,
     letterSpacing: 0.65,
   },
-  cinematicNoPressure: { color: "#D7C8E6", fontSize: 10, marginTop: 9 },
+  cinematicNoPressure: { color: "#CAD2E4", fontSize: 10, marginTop: 9 },
   cinematicFootRail: {
     minHeight: 44,
     flexDirection: "row",
@@ -28238,13 +28481,13 @@ const s = StyleSheet.create({
     borderTopColor: "rgba(255,255,255,0.25)",
   },
   cinematicFootRailText: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 8,
     fontFamily: F.bold,
     letterSpacing: 0.8,
   },
   cinematicFootRailRule: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.24)" },
-  cinematicHow: { backgroundColor: "#F2EEF5", paddingHorizontal: 22, paddingVertical: 74 },
+  cinematicHow: { backgroundColor: "#EFF1F4", paddingHorizontal: 22, paddingVertical: 74 },
   cinematicHowInner: { width: "100%", maxWidth: 1240, alignSelf: "center", gap: 44 },
   cinematicHowInnerWide: { flexDirection: "row", gap: 90, paddingVertical: 28 },
   cinematicHowLead: { flex: 0.9 },
@@ -28259,7 +28502,7 @@ const s = StyleSheet.create({
     color: C.ink,
     fontSize: 38,
     lineHeight: 41,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -1.6,
   },
   cinematicHowTitleWide: { fontSize: 52, lineHeight: 54, letterSpacing: -2.4 },
@@ -28270,14 +28513,14 @@ const s = StyleSheet.create({
     lineHeight: 23,
     marginTop: 18,
   },
-  cinematicSteps: { flex: 1.1, borderTopWidth: 1, borderTopColor: "#CFC5D7" },
+  cinematicSteps: { flex: 1.1, borderTopWidth: 1, borderTopColor: "#C6CBD6" },
   cinematicStep: {
     minHeight: 104,
     flexDirection: "row",
     alignItems: "center",
     gap: 17,
     borderBottomWidth: 1,
-    borderBottomColor: "#CFC5D7",
+    borderBottomColor: "#C6CBD6",
   },
   cinematicStepNumber: {
     width: 32,
@@ -28302,10 +28545,10 @@ const s = StyleSheet.create({
     color: C.white,
     fontSize: 32,
     lineHeight: 34,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -1.4,
   },
-  cinematicJoinText: { color: "#D7C8E6", fontSize: 14, lineHeight: 21, marginTop: 8 },
+  cinematicJoinText: { color: "#CAD2E4", fontSize: 14, lineHeight: 21, marginTop: 8 },
   cinematicJoinButton: {
     minHeight: 54,
     minWidth: 230,
@@ -28330,14 +28573,14 @@ const s = StyleSheet.create({
     alignSelf: "center",
     marginTop: 38,
     borderTopWidth: 1,
-    borderTopColor: "#60436F",
+    borderTopColor: "#46526C",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 18,
   },
   cinematicFooterLinks: { flexDirection: "row", gap: 20 },
-  cinematicFooterLink: { color: "#CDBED8", fontSize: 11, fontFamily: F.semibold },
+  cinematicFooterLink: { color: "#C0C7D6", fontSize: 11, fontFamily: F.semibold },
   authWelcome: {
     flexGrow: 1,
     paddingHorizontal: 20,
@@ -28359,7 +28602,7 @@ const s = StyleSheet.create({
   authMarkText: { color: C.white, fontSize: 23, fontFamily: F.black },
   authBrand: { color: C.white, fontSize: 15, fontFamily: F.black },
   authBrandSub: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 10,
     marginTop: 2,
     fontFamily: F.semibold,
@@ -28383,12 +28626,12 @@ const s = StyleSheet.create({
     color: C.white,
     fontSize: 34,
     lineHeight: 37,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -1.1,
     maxWidth: 350,
   },
   authIntro: {
-    color: "#E7DEEE",
+    color: "#E1E4EB",
     fontSize: 15,
     lineHeight: 22,
     marginTop: 12,
@@ -28397,7 +28640,7 @@ const s = StyleSheet.create({
   authMatchPreview: {
     marginTop: 25,
     borderRadius: 12,
-    backgroundColor: "#3B1554",
+    backgroundColor: "#1A2A4F",
     padding: 14,
   },
   authPreviewTop: { flexDirection: "row", alignItems: "center", gap: 7 },
@@ -28409,7 +28652,7 @@ const s = StyleSheet.create({
   },
   authPreviewLabel: {
     flex: 1,
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 10,
     fontFamily: F.bold,
     letterSpacing: 0.35,
@@ -28444,10 +28687,10 @@ const s = StyleSheet.create({
     marginTop: 13,
     paddingTop: 11,
     borderTopWidth: 1,
-    borderColor: "#67447C",
+    borderColor: "#485678",
   },
   authFitReason: { flexDirection: "row", alignItems: "center", gap: 5 },
-  authFitReasonText: { color: "#E7DEEE", fontSize: 10, fontFamily: F.medium },
+  authFitReasonText: { color: "#E1E4EB", fontSize: 10, fontFamily: F.medium },
   authPreviewTeams: {
     flexDirection: "row",
     alignItems: "center",
@@ -28466,7 +28709,7 @@ const s = StyleSheet.create({
   },
   authMiniCrestText: { color: C.white, fontSize: 12, fontFamily: F.black },
   authPreviewTitle: { color: C.white, fontSize: 15, fontFamily: F.bold },
-  authPreviewMeta: { color: "#D7C8E6", fontSize: 11, marginTop: 4 },
+  authPreviewMeta: { color: "#CAD2E4", fontSize: 11, marginTop: 4 },
   authDecision: { marginTop: 25 },
   authQuestion: { color: C.white, fontSize: 14, fontFamily: F.bold },
   authRoleWrap: {
@@ -28480,7 +28723,7 @@ const s = StyleSheet.create({
     minHeight: 42,
     paddingHorizontal: 12,
     borderRadius: 21,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -28502,7 +28745,7 @@ const s = StyleSheet.create({
   },
   authPrimaryButtonText: { color: C.redDark, fontSize: 15, fontFamily: F.bold },
   authNoPressure: {
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 11,
     textAlign: "center",
     marginTop: 9,
@@ -28520,7 +28763,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
   },
   authTextButtonLabel: { color: C.white, fontSize: 13, fontFamily: F.semibold },
-  authDivider: { width: 1, height: 18, backgroundColor: "#67447C" },
+  authDivider: { width: 1, height: 18, backgroundColor: "#485678" },
   authFormScreen: {
     flexGrow: 1,
     paddingHorizontal: 20,
@@ -28551,7 +28794,7 @@ const s = StyleSheet.create({
     minHeight: 46,
     padding: 3,
     borderRadius: 8,
-    backgroundColor: "#E9E4EF",
+    backgroundColor: "#E6E8ED",
     flexDirection: "row",
   },
   authContactOption: {
@@ -28580,7 +28823,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
     color: C.ink,
     paddingHorizontal: 13,
-    fontSize: 15,
+    fontSize: 17,
     fontFamily: F.regular,
   },
   authFieldHelp: {
@@ -28603,7 +28846,7 @@ const s = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 13,
     color: C.ink,
-    fontSize: 15,
+    fontSize: 17,
     fontFamily: F.regular,
   },
   authPasswordToggle: {
@@ -28773,7 +29016,7 @@ const s = StyleSheet.create({
     alignSelf: "flex-end",
   },
   chatMessageTimeOwn: {
-    color: "#EEE5FF",
+    color: "#EDF0F7",
   },
   videoRow: {
     minHeight: 62,
@@ -28792,10 +29035,10 @@ const s = StyleSheet.create({
     color: "white",
     fontSize: 30,
     lineHeight: 34,
-    fontFamily: F.black,
+    fontFamily: F.score,
     letterSpacing: -0.8,
   },
-  roleHomeCopy: { color: "#E9DFF5", lineHeight: 20, marginTop: 9 },
+  roleHomeCopy: { color: "#E3E7F1", lineHeight: 20, marginTop: 9 },
   appearanceIntro: {
     marginHorizontal: 16,
     marginBottom: 20,
@@ -28808,7 +29051,7 @@ const s = StyleSheet.create({
   },
   appearanceIntroTitle: { color: C.white, fontSize: 16, fontFamily: F.bold },
   appearanceIntroCopy: {
-    color: "#E9DFF5",
+    color: "#E3E7F1",
     fontSize: 12,
     lineHeight: 18,
     marginTop: 5,
@@ -28839,7 +29082,7 @@ const s = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -28892,7 +29135,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: C.line,
-    backgroundColor: "#F3EEF8",
+    backgroundColor: "#F0F2F6",
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
@@ -28956,7 +29199,7 @@ const s = StyleSheet.create({
     minWidth: 74,
     textAlign: "center",
     fontSize: 25,
-    fontFamily: F.black,
+    fontFamily: F.score,
     color: C.redDark,
     fontVariant: ["tabular-nums"],
   },
@@ -29005,7 +29248,7 @@ const s = StyleSheet.create({
     color: C.redDark,
     fontSize: 34,
     lineHeight: 39,
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
   },
   scoreConfirmationDivider: { color: C.muted, fontSize: 24 },
@@ -29087,7 +29330,7 @@ const s = StyleSheet.create({
     fontSize: 27,
     lineHeight: 32,
     textAlign: "center",
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
   },
   resultListActions: {
@@ -29168,12 +29411,12 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
-    backgroundColor: "#EEE8F6",
+    backgroundColor: "#EBEDF3",
     borderWidth: 1,
     borderColor: C.line,
   },
   profileVerificationRequested: {
-    backgroundColor: "#F5F1FA",
+    backgroundColor: "#F3F4F8",
     borderColor: C.red,
   },
   profileTabs: {
@@ -29269,7 +29512,7 @@ const s = StyleSheet.create({
     fontFamily: F.black,
     textAlign: "center",
   },
-  publicProfileMeta: { color: "#E9DFF5", marginTop: 6, textAlign: "center" },
+  publicProfileMeta: { color: "#E3E7F1", marginTop: 6, textAlign: "center" },
   publicPending: {
     marginTop: 12,
     paddingVertical: 7,
@@ -29403,7 +29646,7 @@ const s = StyleSheet.create({
     height: 17,
     paddingHorizontal: 4,
     borderRadius: 9,
-    backgroundColor: "#D93B4B",
+    backgroundColor: "#B3121F",
     borderWidth: 2,
     borderColor: C.shell,
     alignItems: "center",
@@ -29428,7 +29671,7 @@ const s = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 10,
-    backgroundColor: "#F1EDF5",
+    backgroundColor: "#EFF0F3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -29439,7 +29682,7 @@ const s = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#D93B4B",
+    backgroundColor: "#B3121F",
     borderWidth: 1,
     borderColor: C.white,
   },
@@ -29525,7 +29768,7 @@ const s = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 10,
-    backgroundColor: "#F1EDF5",
+    backgroundColor: "#EFF0F3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -29574,7 +29817,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F7F4F8",
+    backgroundColor: "#F5F6F7",
     borderWidth: 1,
     borderTopWidth: 0,
     borderColor: C.line,
@@ -29611,7 +29854,7 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
   matchStoryVenueLabel: {
-    color: "#D8CBE2",
+    color: "#CDD3E0",
     fontSize: 8,
     fontFamily: F.bold,
     letterSpacing: 1,
@@ -29624,7 +29867,7 @@ const s = StyleSheet.create({
     color: C.white,
     fontSize: 34,
     lineHeight: 40,
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
   },
   matchStoryVerified: {
@@ -29663,7 +29906,7 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 9,
-    backgroundColor: "#F1EDF5",
+    backgroundColor: "#EFF0F3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -29682,7 +29925,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F1EDF5",
+    backgroundColor: "#EFF0F3",
   },
   statsPeriodControl: {
     paddingVertical: 14,
@@ -30045,7 +30288,7 @@ const s = StyleSheet.create({
     minWidth: 56,
     color: C.redDark,
     fontSize: 18,
-    fontFamily: F.black,
+    fontFamily: F.score,
     fontVariant: ["tabular-nums"],
     textAlign: "center",
   },
@@ -30125,7 +30368,7 @@ const s = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: C.muted,
   },
-  legalLinkDotLight: { backgroundColor: "#BFAED0" },
+  legalLinkDotLight: { backgroundColor: "#B1B9CD" },
   legalSafe: { flex: 1, backgroundColor: C.cream },
   legalHeader: {
     minHeight: 72,
@@ -30171,7 +30414,7 @@ const s = StyleSheet.create({
     fontSize: 34,
     lineHeight: 39,
     letterSpacing: -0.9,
-    fontFamily: F.black,
+    fontFamily: F.score,
   },
   legalUpdated: {
     marginTop: 8,
@@ -30183,7 +30426,7 @@ const s = StyleSheet.create({
   legalSummary: {
     maxWidth: 620,
     marginTop: 16,
-    color: "#E3D8EC",
+    color: "#DCE0E8",
     fontSize: 14,
     lineHeight: 21,
   },
@@ -30276,7 +30519,7 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: "rgba(20, 8, 28, 0.72)",
+    backgroundColor: "rgba(7, 20, 51, 0.72)",
   },
   notFoundCircle: {
     position: "absolute",
@@ -30323,7 +30566,7 @@ const s = StyleSheet.create({
     fontSize: 72,
     lineHeight: 76,
     letterSpacing: -2.2,
-    fontFamily: F.black,
+    fontFamily: F.score,
   },
   notFoundZero: {
     width: 65,
@@ -30340,12 +30583,12 @@ const s = StyleSheet.create({
     fontSize: 36,
     lineHeight: 40,
     letterSpacing: -1,
-    fontFamily: F.black,
+    fontFamily: F.score,
   },
   notFoundCopy: {
     maxWidth: 460,
     marginTop: 13,
-    color: "#D7C8E6",
+    color: "#CAD2E4",
     fontSize: 14,
     lineHeight: 22,
   },
@@ -30370,7 +30613,9 @@ const s = StyleSheet.create({
 export default function FriendliesRoot() {
   return (
     <SafeAreaProvider>
-      <App />
+      <UiPrefsProvider>
+        <App />
+      </UiPrefsProvider>
     </SafeAreaProvider>
   );
 }
