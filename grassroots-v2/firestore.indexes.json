@@ -1,0 +1,6 @@
+{
+  "indexes": [
+    { "collectionGroup": "matches", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "needRef", "order": "ASCENDING" }, { "fieldPath": "date", "order": "ASCENDING" } ] }
+  ],
+  "fieldOverrides": []
+}

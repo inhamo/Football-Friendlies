@@ -1,0 +1,60 @@
+rules_version = '2';
+// Grassroots v2 — Firestore rules (free Spark plan).
+// Captains/referees log in with phone + 4-number code. Players use anonymous login from a WhatsApp link
+// and can ONLY change the "I'm in / I can't come" list.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function realUser() { return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+    function changedOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function isRef() { return realUser() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ref'; }
+
+    match /users/{uid} {
+      allow read: if realUser();
+      allow create: if request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'role', 'teamId', 'createdAt'])
+        && request.resource.data.role in ['captain', 'ref'];
+      allow update: if request.auth.uid == uid && changedOnly(['name', 'teamId']);
+    }
+
+    match /teams/{teamId} {
+      allow read: if signedIn();
+      allow create: if realUser() && request.resource.data.captainId == request.auth.uid;
+      allow update: if realUser() && resource.data.captainId == request.auth.uid
+        && request.resource.data.captainId == resource.data.captainId;
+    }
+
+    // "We are free on Saturday" posts. Id = <teamId>_<date>.
+    match /slots/{slotId} {
+      allow read: if signedIn();
+      allow create: if realUser() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if realUser() && (resource.data.ownerId == request.auth.uid
+        || (changedOnly(['status']) && request.resource.data.status == 'taken'));
+    }
+
+    match /challenges/{cId} {
+      allow read: if realUser() && request.auth.uid in resource.data.captains;
+      allow create: if realUser() && request.auth.uid in request.resource.data.captains
+        && get(/databases/$(database)/documents/teams/$(request.resource.data.fromTeamId)).data.captainId == request.auth.uid;
+      allow update: if realUser() && request.auth.uid in resource.data.captains && changedOnly(['status']);
+    }
+
+    // Match id = challenge id, so one challenge can only ever make one match.
+    match /matches/{mId} {
+      allow read: if signedIn();
+      allow create: if realUser() && request.auth.uid in request.resource.data.captains
+        && request.auth.uid in get(/databases/$(database)/documents/challenges/$(mId)).data.captains;
+      allow update: if
+        // players from the WhatsApp link: only the RSVP list
+        (signedIn() && changedOnly(['rsvp']))
+        // a referee can volunteer once
+        || (isRef() && resource.data.ref == null && changedOnly(['ref', 'needRef']))
+        // the two captains run the match; a final score must match BOTH captains' entries
+        || (realUser() && request.auth.uid in resource.data.captains
+            && changedOnly(['scores', 'final', 'status', 'cancelledBy', 'cancelledAt', 'cost', 'paid', 'ref', 'needRef'])
+            && (!('final' in request.resource.data) || request.resource.data.final == null
+                || (request.resource.data.scores[resource.data.homeId] == request.resource.data.final
+                    && request.resource.data.scores[resource.data.awayId] == request.resource.data.final)));
+    }
+  }
+}
