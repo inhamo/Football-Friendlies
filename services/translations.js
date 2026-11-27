@@ -2,6 +2,18 @@
 // FIRST DRAFT — have a native speaker of each language check every line before release.
 // Keys are the English text in lower case. Anything not listed stays in English.
 const T = {
+  // create-team steps
+  "what is your team called?": ["Chikwata chenyu chinonzi chii?", "Iqembu lakho libizwa ngokuthini?"],
+  "where does your team play?": ["Chikwata chenyu chinotambira kupi?", "Iqembu lakho lidlalela ngaphi?"],
+  "who plays in your team?": ["Vanotambira chikwata chenyu ndivanaani?", "Ngobani abadlalela iqembu lakho?"],
+  "badge and kits": ["Bheji nemayunifomu", "Ibheji lezembatho zokudlala"],
+  "home ground and extras": ["Nhandare yenyu nezvimwe", "Inkundla yenu lokunye"],
+  "check and create": ["Tarisa wozogadzira", "Hlola ubusuyenza"],
+  "create a team": ["Gadzira chikwata", "Yenza iqembu"],
+  "skip for now": ["Siya parizvino", "Tshiya okwamanje"],
+  "change": ["Shandura", "Guqula"],
+  "use my location": ["Shandisa pandiri", "Sebenzisa lapho engikhona"],
+  "open my team": ["Vhura chikwata changu", "Vula iqembu lami"],
   // bottom tabs + headers
   "home": ["Kumba", "Ekhaya"],
   "teams": ["Zvikwata", "Amaqembu"],

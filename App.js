@@ -8081,267 +8081,6 @@ function JerseyArt({ kit, size = "large", sponsor = "", crestLabel = "" }) {
   );
 }
 
-function TeamSetupTool({ tool, close }) {
-  const [contact, setContact] = useState("");
-  const [items, setItems] = useState([]);
-  const [permission, setPermission] = useState("Squad & lineup");
-  const [ground, setGround] = useState("");
-  const [area, setArea] = useState("");
-  const [groundCoordinate, setGroundCoordinate] = useState({
-    latitude: -17.8249,
-    longitude: 31.053,
-  });
-  const [groundSaved, setGroundSaved] = useState(false);
-  const [checks, setChecks] = useState({
-    captain: false,
-    phone: false,
-    identity: false,
-    ground: false,
-  });
-  const [verificationSent, setVerificationSent] = useState(false);
-  const addItem = () => {
-    if (!contact.trim()) return;
-    setItems((current) => [...current, { name: contact.trim(), permission }]);
-    setContact("");
-  };
-  const verifiedReady = Object.values(checks).every(Boolean);
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 30 }}
-    >
-      <View style={s.subHeader}>
-        <Pressable
-          onPress={close}
-          accessibilityRole="button"
-          accessibilityLabel="Back to team creation"
-        >
-          <Ionicons name="arrow-back" size={23} />
-        </Pressable>
-        <View style={{ flex: 1, marginLeft: 14 }}>
-          <AppText style={s.headerTitle}>{tool.toUpperCase()}</AppText>
-          <AppText style={s.headerSub}>TEAM SETUP</AppText>
-        </View>
-      </View>
-      <View style={s.formIntro}>
-        <AppText style={s.screenTitle}>{tool}</AppText>
-        <AppText style={s.body}>
-          {tool === "Player invitations"
-            ? "Invite players now and track every pending place."
-            : tool === "Assistant coaches"
-              ? "Add staff with a clear, limited permission level."
-              : tool === "Home ground"
-                ? "Save the ground teams will use for fixture and travel checks."
-                : "Submit evidence once the team identity is complete."}
-        </AppText>
-      </View>
-      {tool === "Player invitations" ? (
-        <View style={s.formSection}>
-          <AppText style={s.formLabel}>Phone number or email</AppText>
-          <View style={s.inviteComposer}>
-            <TextInput
-              value={contact}
-              onChangeText={setContact}
-              style={s.inviteInput}
-              placeholder="e.g. +263 77 123 4567"
-              placeholderTextColor={C.muted}
-            />
-            <Pressable
-              onPress={addItem}
-              style={s.inviteButton}
-              accessibilityLabel="Send player invitation"
-            >
-              <Ionicons name="send" color="white" size={18} />
-            </Pressable>
-          </View>
-          {items.map((item) => (
-            <View key={item.name} style={s.invitedRow}>
-              <View style={s.playerAvatar}>
-                <AppText style={s.playerAvatarText}>
-                  {initials(item.name)}
-                </AppText>
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppText style={s.team}>{item.name}</AppText>
-                <AppText style={s.meta}>
-                  Invite sent · expires in 7 days
-                </AppText>
-              </View>
-              <Ionicons name="checkmark-circle" color={C.green} size={20} />
-            </View>
-          ))}
-          {!items.length ? (
-            <View style={s.setupEmpty}>
-              <AppText style={s.team}>No invitations yet</AppText>
-              <AppText style={s.body}>
-                Add the first player by phone or email.
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-      {tool === "Assistant coaches" ? (
-        <View style={s.formSection}>
-          <AppText style={s.formLabel}>Coach phone or email</AppText>
-          <TextInput
-            value={contact}
-            onChangeText={setContact}
-            style={s.formInput}
-            placeholder="Coach contact"
-            placeholderTextColor={C.muted}
-          />
-          <AppText style={s.formLabel}>Permission</AppText>
-          <View style={s.optionWrap}>
-            {["Squad & lineup", "Fixtures & chat", "Full team access"].map(
-              (item) => (
-                <Pressable
-                  key={item}
-                  onPress={() => setPermission(item)}
-                  style={[
-                    s.formChoice,
-                    permission === item && s.formChoiceActive,
-                  ]}
-                >
-                  <AppText
-                    style={[
-                      s.formChoiceText,
-                      permission === item && s.formChoiceTextActive,
-                    ]}
-                  >
-                    {item}
-                  </AppText>
-                </Pressable>
-              ),
-            )}
-          </View>
-          <Pressable onPress={addItem} style={s.saveLineupButton}>
-            <Ionicons name="person-add-outline" color="white" size={18} />
-            <AppText style={s.saveLineupText}>INVITE ASSISTANT</AppText>
-          </Pressable>
-          {items.map((item) => (
-            <View key={item.name} style={s.invitedRow}>
-              <View style={s.playerAvatar}>
-                <AppText style={s.playerAvatarText}>
-                  {initials(item.name)}
-                </AppText>
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppText style={s.team}>{item.name}</AppText>
-                <AppText style={s.meta}>{item.permission} · Pending</AppText>
-              </View>
-              <Ionicons name="time-outline" color={C.red} size={20} />
-            </View>
-          ))}
-        </View>
-      ) : null}
-      {tool === "Home ground" ? (
-        <View style={s.formSection}>
-          {groundSaved ? (
-            <View style={s.inlineSuccess}>
-              <Ionicons name="checkmark-circle" color={C.green} size={21} />
-              <AppText style={s.team}>Home ground saved</AppText>
-            </View>
-          ) : null}
-          <AppText style={s.formLabel}>Ground name</AppText>
-          <TextInput
-            value={ground}
-            onChangeText={(value) => {
-              setGround(value);
-              setGroundSaved(false);
-            }}
-            style={s.formInput}
-          />
-          <AppText style={s.formLabel}>Area</AppText>
-          <TextInput
-            value={area}
-            onChangeText={(value) => {
-              setArea(value);
-              setGroundSaved(false);
-            }}
-            style={s.formInput}
-          />
-          <GroundMap
-            coordinate={groundCoordinate}
-            onChange={setGroundCoordinate}
-          />
-          <Pressable
-            onPress={() =>
-              setGroundSaved(Boolean(ground.trim() && area.trim()))
-            }
-            style={[s.saveLineupButton, groundSaved && s.saveLineupButtonSaved]}
-          >
-            <Ionicons name="location-outline" color="white" size={18} />
-            <AppText style={s.saveLineupText}>
-              {groundSaved ? "GROUND SAVED" : "SAVE HOME GROUND"}
-            </AppText>
-          </Pressable>
-        </View>
-      ) : null}
-      {tool === "Verification" ? (
-        <View style={s.formSection}>
-          {[
-            ["captain", "Captain identity", "Photo ID and team authority"],
-            ["phone", "Contact number", "One-time phone confirmation"],
-            ["identity", "Team identity", "Name, badge and kit completed"],
-            ["ground", "Home ground", "Ground or area confirmed"],
-          ].map((item) => (
-            <Pressable
-              key={item[0]}
-              onPress={() => {
-                setChecks((current) => ({
-                  ...current,
-                  [item[0]]: !current[item[0]],
-                }));
-                setVerificationSent(false);
-              }}
-              style={s.checklistRow}
-            >
-              <View
-                style={[s.checkCircle, checks[item[0]] && s.checkCircleActive]}
-              >
-                {checks[item[0]] ? (
-                  <Ionicons name="checkmark" color="white" size={15} />
-                ) : null}
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppText style={s.team}>{item[1]}</AppText>
-                <AppText style={s.meta}>{item[2]}</AppText>
-              </View>
-            </Pressable>
-          ))}
-          <Pressable
-            disabled={!verifiedReady}
-            onPress={() => setVerificationSent(true)}
-            style={[
-              s.saveLineupButton,
-              !verifiedReady && s.buttonDisabled,
-              verificationSent && s.saveLineupButtonSaved,
-            ]}
-          >
-            <Ionicons
-              name={
-                verificationSent
-                  ? "checkmark-circle"
-                  : "shield-checkmark-outline"
-              }
-              color="white"
-              size={18}
-            />
-            <AppText style={s.saveLineupText}>
-              {verificationSent ? "UNDER REVIEW" : "SUBMIT VERIFICATION"}
-            </AppText>
-          </Pressable>
-          <AppText style={s.formHelp}>
-            {verifiedReady
-              ? "Review normally takes one working day."
-              : "Complete all four checks before submitting."}
-          </AppText>
-        </View>
-      ) : null}
-    </ScrollView>
-  );
-}
-
 function DropdownField({
   label,
   required = false,
@@ -8805,7 +8544,17 @@ const normaliseLiveAddress = (address, current) => {
   };
 };
 
+const CREATE_TEAM_STEPS = [
+  { key: "name", title: "What is your team called?", help: "Use the name people already know your team by." },
+  { key: "place", title: "Where does your team play?", help: "Teams nearby use this to find you for friendlies." },
+  { key: "who", title: "Who plays in your team?", help: "Friendlies, rankings and leagues use this." },
+  { key: "look", title: "Badge and kits", help: "Optional. You can change these later.", optional: true },
+  { key: "ground", title: "Home ground and extras", help: "Optional. You can add these later.", optional: true },
+  { key: "check", title: "Check and create", help: "Make sure everything is right, then create your team." },
+];
+
 function CreateTeamScreenV2({ close, onCreateTeam }) {
+  const [step, setStep] = useState(0);
   const [teamName, setTeamName] = useState("");
   const [coachName, setCoachName] = useState("");
   const [location, setLocation] = useState(savedTeamLocation());
@@ -8816,54 +8565,85 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
     latitude: -17.8249,
     longitude: 31.053,
   });
-  const [badgeColor, setBadgeColor] = useState("#6C2BEA");
+  const [groundTouched, setGroundTouched] = useState(false);
+  const [badgeColor, setBadgeColor] = useState(C.red);
   const [badgeShape, setBadgeShape] = useState(0);
   const [kits, setKits] = useState([null, null, null]);
   const [activeKit, setActiveKit] = useState(null);
   const [draftKit, setDraftKit] = useState({
     pattern: "Stripes",
-    primary: "#6C2BEA",
-    accent: "#B9F34A",
+    primary: C.red,
+    accent: C.gold,
   });
-  const [setupTool, setSetupTool] = useState(null);
+  const [lookTouched, setLookTouched] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedTeamName, setSavedTeamName] = useState("");
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationMessage, setLocationMessage] = useState("");
   const [saveError, setSaveError] = useState("");
-  // Optional extras stay folded away so the required questions and the Create button come first.
-  const [showMore, setShowMore] = useState(false);
   const saveLock = useRef(false);
+  const scrollRef = useRef(null);
   const area = teamLocationLabel(location);
-  const selectedBadgeColor = badgeColor;
+  const current = CREATE_TEAM_STEPS[step];
   const palette = [
-    "#6C2BEA",
-    "#B9F34A",
+    C.red,
+    C.gold,
     "#FFFFFF",
     "#17131D",
     "#D93B4B",
     "#168A53",
-    "#E4A72E",
     "#2878C8",
     "#F07C37",
+    "#6C2BEA",
   ];
+  const placeComplete = Boolean(
+    location.country &&
+      location.province &&
+      location.city &&
+      location.suburb?.trim(),
+  );
+  const stepReady =
+    current.key === "name"
+      ? Boolean(teamName.trim())
+      : current.key === "place"
+        ? placeComplete
+        : current.key === "who"
+          ? Boolean(ageGroup && teamCategory)
+          : true;
+  const optionalUntouched =
+    (current.key === "look" && !lookTouched) ||
+    (current.key === "ground" &&
+      !groundTouched &&
+      !coachName.trim() &&
+      !sponsor.trim());
+  const goTo = (next) => {
+    setStep(Math.max(0, Math.min(CREATE_TEAM_STEPS.length - 1, next)));
+    setActiveKit(null);
+    setSaveError("");
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false });
+  };
+  const goBack = () => (step === 0 ? close() : goTo(step - 1));
+  const goNext = () => {
+    if (!stepReady) return;
+    goTo(step + 1);
+  };
   const openKit = (index) => {
     setActiveKit(index);
     setDraftKit(
       kits[index] || {
         pattern: "Stripes",
         primary: palette[index],
-        accent: index === 0 ? "#B9F34A" : "#FFFFFF",
+        accent: index === 0 ? C.gold : "#FFFFFF",
       },
     );
   };
   const saveKit = () => {
-    setKits((current) =>
-      current.map((kit, index) => (index === activeKit ? draftKit : kit)),
+    setKits((list) =>
+      list.map((kit, index) => (index === activeKit ? draftKit : kit)),
     );
     setActiveKit(null);
-    setSaved(false);
+    setLookTouched(true);
   };
   const useCurrentLocation = async () => {
     if (locating) return;
@@ -8876,23 +8656,22 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
           actionErrorText(
             "Your current location was not added.",
             "Location permission is turned off for Grassroots.",
-            "Allow location access in device settings or enter the area manually.",
+            "Allow location access in device settings or choose the area below.",
           ),
         );
         return;
       }
-      const current = await Location.getCurrentPositionAsync({
+      const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
       const coordinate = {
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
       };
       setGroundCoordinate(coordinate);
+      setGroundTouched(true);
       if (Platform.OS === "web") {
-        setLocationMessage(
-          "Current map pin added. Add the written area details before saving.",
-        );
+        setLocationMessage("Map pin added. Now choose your area below.");
         return;
       }
       const addresses = await Location.reverseGeocodeAsync(coordinate);
@@ -8901,63 +8680,28 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
         setLocation(nextLocation);
         setLocationMessage(
           nextLocation.city
-            ? "Current location added. Check the local area before saving."
-            : "Map pin added. Choose the closest province and city to finish.",
+            ? "Location added. Check the area below is right."
+            : "Map pin added. Choose your province and city below.",
         );
       } else {
-        setLocationMessage(
-          "Map pin added. Add the written area details before saving.",
-        );
+        setLocationMessage("Map pin added. Now choose your area below.");
       }
     } catch (error) {
       setLocationMessage(
         actionErrorText(
           "Your current location was not added.",
-          "The device could not provide a location right now.",
-          "Turn on location services and try again, or enter the area manually.",
+          "The phone could not find your location right now.",
+          "Turn on location and try again, or choose the area below.",
         ),
       );
     } finally {
       setLocating(false);
     }
   };
-  const clearTeamDraft = () => {
-    setTeamName("");
-    setCoachName("");
-    setLocation(savedTeamLocation());
-    setAgeGroup("Senior");
-    setTeamCategory("Men's");
-    setSponsor("");
-    setGroundCoordinate({ latitude: -17.8249, longitude: 31.053 });
-    setBadgeColor("#6C2BEA");
-    setBadgeShape(0);
-    setKits([null, null, null]);
-    setActiveKit(null);
-    setDraftKit({
-      pattern: "Stripes",
-      primary: "#6C2BEA",
-      accent: "#B9F34A",
-    });
-    setLocationMessage("");
-  };
   const createTeam = async () => {
     if (saveLock.current || saved) return;
-    if (
-      !teamName.trim() ||
-      !location.country ||
-      !location.province ||
-      !location.city ||
-      !location.suburb.trim()
-    ) {
-      setSaveError(
-        actionErrorText(
-          "The team was not saved.",
-          "One or more required team or location fields are empty.",
-          "Complete every field marked * and press Create team again.",
-        ),
-      );
-      return;
-    }
+    if (!teamName.trim()) return goTo(0);
+    if (!placeComplete) return goTo(1);
     saveLock.current = true;
     setSaving(true);
     setSaveError("");
@@ -8969,18 +8713,17 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
         location,
         ageGroup,
         teamCategory,
-        coachName,
-        sponsor,
+        coachName: coachName.trim(),
+        sponsor: sponsor.trim(),
         crest: {
           shape: badgeShape,
-          color: selectedBadgeColor,
-          label: initials(teamName),
+          color: badgeColor,
+          label: initials(submittedTeamName),
         },
         kits,
         ground: { name: "", coordinate: groundCoordinate },
       });
       setSavedTeamName(submittedTeamName);
-      clearTeamDraft();
       setSaved(true);
     } catch (error) {
       saveLock.current = false;
@@ -8999,8 +8742,8 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
               )
             : actionErrorText(
                 "The team was not saved.",
-                "The save request did not finish successfully.",
-                "Keep the form open and press Create team again.",
+                "The save did not finish.",
+                "Your answers are still here. Press Create team again.",
               ),
       );
       console.warn("Team setup failed", error?.code || error?.message);
@@ -9008,345 +8751,427 @@ function CreateTeamScreenV2({ close, onCreateTeam }) {
       setSaving(false);
     }
   };
-  if (setupTool)
-    return <TeamSetupTool tool={setupTool} close={() => setSetupTool(null)} />;
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 30 }}
-    >
-      <View style={s.subHeader}>
-        <Pressable
-          onPress={close}
-          accessibilityRole="button"
-          accessibilityLabel="Back to Team"
-        >
-          <Ionicons name="arrow-back" size={23} />
-        </Pressable>
-        <View style={{ flex: 1, marginLeft: 14 }}>
-          <AppText style={s.headerTitle}>CREATE A TEAM</AppText>
-          <AppText style={s.headerSub}>COACH TOOLS</AppText>
-        </View>
-      </View>
-      {saved ? (
-        <View style={s.createdBanner}>
-          <Ionicons name="checkmark-circle" size={24} color={C.green} />
-          <View>
-            <AppText style={s.team}>{savedTeamName} saved</AppText>
-            <AppText style={s.meta}>
-              Your team profile is ready for players.
-            </AppText>
-          </View>
-        </View>
-      ) : null}
-      <View style={s.teamCreatorHero}>
+
+  if (saved)
+    return (
+      <ScrollView contentContainerStyle={s.teamStepDone}>
         <CrestPreview
           shape={badgeShape}
-          color={selectedBadgeColor}
-          label={initials(teamName || "New Team")}
+          color={badgeColor}
+          label={initials(savedTeamName)}
         />
-        <View style={s.jerseyPreview}>
-          <JerseyArt
-            kit={kits[0]}
-            size="small"
-            sponsor={sponsor}
-            crestLabel={initials(teamName)}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <AppText style={s.teamCreatorName}>{teamName || "Your team"}</AppText>
-          <AppText style={s.teamCreatorMeta}>
-            {kits.filter(Boolean).length}/3 kits designed ·{" "}
-            {area || "Area not added"}
-          </AppText>
-          <AppText style={s.meta}>{teamCategory} · {ageGroup}</AppText>
-          <AppText style={s.teamCreatorCoach}>
-            Coach {coachName || "not added"}
-          </AppText>
-        </View>
-      </View>
-      <View style={s.formSection}>
-        <AppText style={s.formSectionTitle}>Team details</AppText>
-        <AppText style={s.requiredHint}>* Required to create the team</AppText>
-        <FormLabel required>Team name</FormLabel>
-        <TextInput
-          value={teamName}
-          onChangeText={setTeamName}
-          style={s.formInput}
-          placeholder="Team name"
-          placeholderTextColor={C.muted}
-        />
+        <Ionicons name="checkmark-circle" size={44} color={C.green} />
+        <AppText style={s.teamStepDoneTitle}>{savedTeamName} is ready</AppText>
+        <AppText style={[s.body, { textAlign: "center" }]}>
+          Your team is saved. Next, add your players and find a team to play.
+        </AppText>
         <Pressable
-          onPress={useCurrentLocation}
-          disabled={locating}
-          style={[s.liveLocationButton, locating && s.buttonDisabled]}
+          style={[s.saveLineupButton, { alignSelf: "stretch" }]}
+          onPress={close}
           accessibilityRole="button"
-          accessibilityState={{ busy: locating, disabled: locating }}
         >
-          {locating ? (
-            <ActivityIndicator size="small" color={C.red} />
-          ) : (
-            <Ionicons name="navigate-circle-outline" size={21} color={C.red} />
-          )}
-          <View style={{ flex: 1 }}>
-            <AppText style={s.buttonText}>
-              {locating ? "FINDING YOUR LOCATION" : "USE CURRENT LOCATION"}
-            </AppText>
-            <AppText style={s.meta}>
-              Fills the area and moves the home ground pin
-            </AppText>
-          </View>
+          <Ionicons name="shield-checkmark-outline" color="white" size={20} />
+          <AppText style={s.saveLineupText}>Open my team</AppText>
         </Pressable>
-        {locationMessage ? (
-          <AppText style={s.liveLocationMessage}>{locationMessage}</AppText>
-        ) : null}
-        <TeamRegionFields value={location} onChange={setLocation} required />
-        <ProfileChoiceGroup
-          label="Age group"
-          required
-          options={["U13", "U15", "U17", "U20", "Senior", "Veterans"]}
-          value={ageGroup}
-          onChange={setAgeGroup}
-        />
-        <ProfileChoiceGroup
-          label="Team category"
-          required
-          options={FOOTBALL_CATEGORIES}
-          value={teamCategory}
-          onChange={setTeamCategory}
-        />
-        <AppText style={s.formHelp}>
-          Friendlies, rankings and competition entry use this category.
-        </AppText>
-        {showMore ? (
-          <>
-        <AppText style={s.formLabel}>Kit sponsor</AppText>
-        <TextInput
-          value={sponsor}
-          onChangeText={setSponsor}
-          style={s.formInput}
-          placeholder="Optional sponsor name"
-          placeholderTextColor={C.muted}
-        />
-        <AppText style={s.formLabel}>Coach name</AppText>
-        <TextInput
-          value={coachName}
-          onChangeText={setCoachName}
-          style={s.formInput}
-          placeholder="Coach or manager"
-          placeholderTextColor={C.muted}
-        />
-          </>
-        ) : null}
+      </ScrollView>
+    );
+
+  const summaryRows = [
+    ["Team name", teamName.trim(), 0],
+    ["Area", area || "Not added", 1],
+    ["Players", `${teamCategory} · ${ageGroup}`, 2],
+    [
+      "Badge and kits",
+      lookTouched
+        ? `${kits.filter(Boolean).length} of 3 kits designed`
+        : "Skipped — add later",
+      3,
+    ],
+    [
+      "Home ground",
+      groundTouched ? "Map pin added" : "Skipped — add later",
+      4,
+    ],
+    ["Coach", coachName.trim() || "Not added", 4],
+    ["Kit sponsor", sponsor.trim() || "Not added", 4],
+  ];
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={s.subHeader}>
+        <Pressable
+          onPress={goBack}
+          accessibilityRole="button"
+          accessibilityLabel={step === 0 ? "Back to Team" : "Previous step"}
+          hitSlop={12}
+        >
+          <Ionicons name="arrow-back" size={25} />
+        </Pressable>
+        <View style={{ flex: 1, marginLeft: 14 }}>
+          <AppText style={s.headerTitle}>Create a team</AppText>
+          <AppText style={s.headerSub}>
+            {`Step ${step + 1} of ${CREATE_TEAM_STEPS.length}`}
+          </AppText>
+        </View>
       </View>
-      <Pressable
-        onPress={() => setShowMore(!showMore)}
-        style={s.moreOptionsToggle}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: showMore }}
+      <View
+        style={s.wizardProgress}
+        accessibilityRole="progressbar"
+        accessibilityValue={{
+          min: 1,
+          max: CREATE_TEAM_STEPS.length,
+          now: step + 1,
+        }}
       >
-        <Ionicons name={showMore ? "chevron-up" : "options-outline"} size={22} color={C.redDark} />
-        <AppText style={s.moreOptionsText}>
-          {showMore ? "Hide extra options" : "More options (badge, kits, map) — optional"}
-        </AppText>
-      </Pressable>
-      {showMore ? (
-        <>
-      <View style={s.formSection}>
-        <AppText style={s.formSectionTitle}>Badge designer</AppText>
-        <AppText style={s.formLabel}>Shape</AppText>
-        <View style={s.crestShapeRow}>
-          {crestShapes.map((shape, index) => (
-            <Pressable
-              key={shape.name}
-              onPress={() => setBadgeShape(index)}
-              style={[
-                s.crestShapeChoice,
-                badgeShape === index && s.crestShapeChoiceActive,
-              ]}
-            >
-              <CrestPreview
-                shape={index}
-                color={selectedBadgeColor}
-                label={initials(teamName)}
-                small
-              />
-              <AppText style={s.meta}>{shape.name}</AppText>
-            </Pressable>
-          ))}
-        </View>
-        <AppText style={s.formLabel}>Badge colour</AppText>
-        <TeamColourPicker
-          value={selectedBadgeColor}
-          onChange={(color) => {
-            setBadgeColor(color);
-            setSaved(false);
-          }}
-        />
-      </View>
-      <View style={s.formSection}>
-        <AppText style={s.formSectionTitle}>Team kits</AppText>
-        <AppText style={s.body}>
-          Open each empty shirt and design it separately.
-        </AppText>
-        <View style={s.kitSlotRow}>
-          {["Home", "Away", "Third"].map((name, index) => (
-            <Pressable
-              key={name}
-              onPress={() => openKit(index)}
-              style={[s.kitSlot, activeKit === index && s.kitSlotActive]}
-            >
-              <JerseyArt
-                kit={kits[index]}
-                size="small"
-                sponsor={sponsor}
-                crestLabel={initials(teamName)}
-              />
-              <AppText style={s.team}>{name}</AppText>
-              <AppText style={s.meta}>
-                {kits[index] ? kits[index].pattern : "Tap to design"}
-              </AppText>
-            </Pressable>
-          ))}
-        </View>
-        {activeKit != null ? (
-          <View style={s.kitEditor}>
-            <View style={s.formTitleRow}>
-              <AppText style={s.formSectionTitle}>
-                Design {["Home", "Away", "Third"][activeKit]}
-              </AppText>
-              <JerseyArt
-                kit={draftKit}
-                size="small"
-                sponsor={sponsor}
-                crestLabel={initials(teamName)}
-              />
-            </View>
-            <AppText style={s.formLabel}>Pattern</AppText>
-            <View style={s.optionWrap}>
-              {["Plain", "Stripes", "Hoops", "Sash"].map((item) => (
-                <Pressable
-                  key={item}
-                  onPress={() =>
-                    setDraftKit((current) => ({ ...current, pattern: item }))
-                  }
-                  style={[
-                    s.formChoice,
-                    draftKit.pattern === item && s.formChoiceActive,
-                  ]}
-                >
-                  <AppText
-                    style={[
-                      s.formChoiceText,
-                      draftKit.pattern === item && s.formChoiceTextActive,
-                    ]}
-                  >
-                    {item}
-                  </AppText>
-                </Pressable>
-              ))}
-            </View>
-            <AppText style={s.formLabel}>Main colour</AppText>
-            <View style={s.colorPicker}>
-              {palette.map((color) => (
-                <Pressable
-                  key={`main-${color}`}
-                  onPress={() =>
-                    setDraftKit((current) => ({ ...current, primary: color }))
-                  }
-                  style={[
-                    s.colorChoice,
-                    { backgroundColor: color },
-                    draftKit.primary === color && s.colorChoiceSelected,
-                  ]}
-                />
-              ))}
-            </View>
-            <AppText style={s.formLabel}>Pattern colour</AppText>
-            <View style={s.colorPicker}>
-              {palette.map((color) => (
-                <Pressable
-                  key={`accent-${color}`}
-                  onPress={() =>
-                    setDraftKit((current) => ({ ...current, accent: color }))
-                  }
-                  style={[
-                    s.colorChoice,
-                    { backgroundColor: color },
-                    draftKit.accent === color && s.colorChoiceSelected,
-                  ]}
-                />
-              ))}
-            </View>
-            <Pressable onPress={saveKit} style={s.saveLineupButton}>
-              <Ionicons name="shirt-outline" color="white" size={18} />
-              <AppText style={s.saveLineupText}>SAVE KIT DESIGN</AppText>
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
-      <View style={s.formSection}>
-        <AppText style={s.formSectionTitle}>Ground location</AppText>
-        <AppText style={s.body}>
-          Tap the map or drag the pin to the team’s usual home area.
-        </AppText>
-        <GroundMap
-          coordinate={groundCoordinate}
-          onChange={setGroundCoordinate}
-        />
-        <AppText style={s.formHelp}>
-          {groundCoordinate.latitude.toFixed(5)},{" "}
-          {groundCoordinate.longitude.toFixed(5)}
-        </AppText>
-      </View>
-      <View style={s.formSection}>
-        <AppText style={s.formSectionTitle}>Finish team setup</AppText>
-        {[
-          ["Player invitations", "Invite by phone or email"],
-          ["Assistant coaches", "Add staff and choose permissions"],
-          ["Home ground", "Save venue and map location"],
-          ["Verification", "Complete identity checks"],
-        ].map((item) => (
-          <Pressable
-            onPress={() => setSetupTool(item[0])}
-            style={s.settingRow}
-            key={item[0]}
-          >
-            <View style={{ flex: 1 }}>
-              <AppText style={s.team}>{item[0]}</AppText>
-              <AppText style={s.meta}>{item[1]}</AppText>
-            </View>
-            <Ionicons name="chevron-forward" color={C.muted} />
-          </Pressable>
+        {CREATE_TEAM_STEPS.map((item, index) => (
+          <View
+            key={item.key}
+            style={[
+              s.wizardProgressBar,
+              index <= step && s.wizardProgressBarActive,
+            ]}
+          />
         ))}
       </View>
-        </>
-      ) : null}
-      <View style={s.formFooter}>
-        {saveError ? (
-          <AppText style={s.authErrorText}>{saveError}</AppText>
+      <ScrollView
+        ref={scrollRef}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      >
+        <View style={s.teamStepIntro}>
+          <AppText style={s.teamStepTitle}>{current.title}</AppText>
+          <AppText style={s.body}>{current.help}</AppText>
+        </View>
+
+        {current.key === "name" && (
+          <View style={s.formSection}>
+            <View style={s.teamStepPreview}>
+              <CrestPreview
+                shape={badgeShape}
+                color={badgeColor}
+                label={initials(teamName || "My Team")}
+              />
+              <AppText style={s.teamStepPreviewName} numberOfLines={2}>
+                {teamName.trim() || "Your team"}
+              </AppText>
+            </View>
+            <FormLabel required>Team name</FormLabel>
+            <TextInput
+              value={teamName}
+              onChangeText={setTeamName}
+              style={s.formInput}
+              placeholder="For example, Mbare Lions"
+              placeholderTextColor={C.muted}
+              autoFocus
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={goNext}
+              maxLength={40}
+            />
+          </View>
+        )}
+
+        {current.key === "place" && (
+          <View style={s.formSection}>
+            <Pressable
+              onPress={useCurrentLocation}
+              disabled={locating}
+              style={[s.liveLocationButton, locating && s.buttonDisabled]}
+              accessibilityRole="button"
+              accessibilityState={{ busy: locating, disabled: locating }}
+            >
+              {locating ? (
+                <ActivityIndicator size="small" color={C.red} />
+              ) : (
+                <Ionicons name="navigate-circle-outline" size={24} color={C.red} />
+              )}
+              <View style={{ flex: 1 }}>
+                <AppText style={s.buttonText}>
+                  {locating ? "Finding your location…" : "Use my location"}
+                </AppText>
+                <AppText style={s.meta}>Fills in the area for you</AppText>
+              </View>
+            </Pressable>
+            {locationMessage ? (
+              <AppText style={s.liveLocationMessage}>{locationMessage}</AppText>
+            ) : null}
+            <TeamRegionFields value={location} onChange={setLocation} required />
+          </View>
+        )}
+
+        {current.key === "who" && (
+          <View style={s.formSection}>
+            <ProfileChoiceGroup
+              label="Men's or women's team"
+              required
+              options={FOOTBALL_CATEGORIES}
+              value={teamCategory}
+              onChange={setTeamCategory}
+            />
+            <ProfileChoiceGroup
+              label="Age group"
+              required
+              options={["U13", "U15", "U17", "U20", "Senior", "Veterans"]}
+              value={ageGroup}
+              onChange={setAgeGroup}
+            />
+          </View>
+        )}
+
+        {current.key === "look" && (
+          <>
+            <View style={s.formSection}>
+              <AppText style={s.formSectionTitle}>Badge</AppText>
+              <AppText style={s.formLabel}>Shape</AppText>
+              <View style={s.crestShapeRow}>
+                {crestShapes.map((shape, index) => (
+                  <Pressable
+                    key={shape.name}
+                    onPress={() => {
+                      setBadgeShape(index);
+                      setLookTouched(true);
+                    }}
+                    style={[
+                      s.crestShapeChoice,
+                      badgeShape === index && s.crestShapeChoiceActive,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: badgeShape === index }}
+                  >
+                    <CrestPreview
+                      shape={index}
+                      color={badgeColor}
+                      label={initials(teamName)}
+                      small
+                    />
+                    <AppText style={s.meta}>{shape.name}</AppText>
+                  </Pressable>
+                ))}
+              </View>
+              <AppText style={s.formLabel}>Badge colour</AppText>
+              <TeamColourPicker
+                value={badgeColor}
+                onChange={(color) => {
+                  setBadgeColor(color);
+                  setLookTouched(true);
+                }}
+              />
+            </View>
+            <View style={s.formSection}>
+              <AppText style={s.formSectionTitle}>Kits</AppText>
+              <AppText style={s.body}>Tap a shirt to design it.</AppText>
+              <View style={s.kitSlotRow}>
+                {["Home", "Away", "Third"].map((name, index) => (
+                  <Pressable
+                    key={name}
+                    onPress={() => openKit(index)}
+                    style={[s.kitSlot, activeKit === index && s.kitSlotActive]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Design ${name} kit`}
+                  >
+                    <JerseyArt
+                      kit={kits[index]}
+                      size="small"
+                      sponsor={sponsor}
+                      crestLabel={initials(teamName)}
+                    />
+                    <AppText style={s.team}>{name}</AppText>
+                    <AppText style={s.meta}>
+                      {kits[index] ? kits[index].pattern : "Tap to design"}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+              {activeKit != null ? (
+                <View style={s.kitEditor}>
+                  <View style={s.formTitleRow}>
+                    <AppText style={s.formSectionTitle}>
+                      {["Home", "Away", "Third"][activeKit]} kit
+                    </AppText>
+                    <JerseyArt
+                      kit={draftKit}
+                      size="small"
+                      sponsor={sponsor}
+                      crestLabel={initials(teamName)}
+                    />
+                  </View>
+                  <AppText style={s.formLabel}>Pattern</AppText>
+                  <View style={s.optionWrap}>
+                    {["Plain", "Stripes", "Hoops", "Sash"].map((item) => (
+                      <Pressable
+                        key={item}
+                        onPress={() =>
+                          setDraftKit((kit) => ({ ...kit, pattern: item }))
+                        }
+                        style={[
+                          s.formChoice,
+                          draftKit.pattern === item && s.formChoiceActive,
+                        ]}
+                      >
+                        <AppText
+                          style={[
+                            s.formChoiceText,
+                            draftKit.pattern === item && s.formChoiceTextActive,
+                          ]}
+                        >
+                          {item}
+                        </AppText>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {[
+                    ["Main colour", "primary"],
+                    ["Pattern colour", "accent"],
+                  ].map(([label, field]) => (
+                    <View key={field}>
+                      <AppText style={s.formLabel}>{label}</AppText>
+                      <View style={s.colorPicker}>
+                        {palette.map((color) => (
+                          <Pressable
+                            key={`${field}-${color}`}
+                            onPress={() =>
+                              setDraftKit((kit) => ({ ...kit, [field]: color }))
+                            }
+                            accessibilityRole="button"
+                            accessibilityLabel={`${label} ${color}`}
+                            style={[
+                              s.colorChoice,
+                              { backgroundColor: color },
+                              draftKit[field] === color && s.colorChoiceSelected,
+                            ]}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  ))}
+                  <Pressable onPress={saveKit} style={s.saveLineupButton}>
+                    <Ionicons name="shirt-outline" color="white" size={18} />
+                    <AppText style={s.saveLineupText}>Keep this kit</AppText>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          </>
+        )}
+
+        {current.key === "ground" && (
+          <>
+            <View style={s.formSection}>
+              <AppText style={s.formSectionTitle}>Home ground</AppText>
+              <AppText style={s.body}>
+                Tap the map or drag the pin to where your team usually plays.
+              </AppText>
+              <GroundMap
+                coordinate={groundCoordinate}
+                onChange={(coordinate) => {
+                  setGroundCoordinate(coordinate);
+                  setGroundTouched(true);
+                }}
+              />
+            </View>
+            <View style={s.formSection}>
+              <AppText style={s.formLabel}>Coach name</AppText>
+              <TextInput
+                value={coachName}
+                onChangeText={setCoachName}
+                style={s.formInput}
+                placeholder="Coach or manager"
+                placeholderTextColor={C.muted}
+                autoCapitalize="words"
+              />
+              <AppText style={s.formLabel}>Kit sponsor</AppText>
+              <TextInput
+                value={sponsor}
+                onChangeText={setSponsor}
+                style={s.formInput}
+                placeholder="Name on the shirt, if any"
+                placeholderTextColor={C.muted}
+              />
+            </View>
+          </>
+        )}
+
+        {current.key === "check" && (
+          <View style={s.formSection}>
+            <View style={s.teamCreatorHero}>
+              <CrestPreview
+                shape={badgeShape}
+                color={badgeColor}
+                label={initials(teamName)}
+              />
+              <View style={{ flex: 1 }}>
+                <AppText style={s.teamCreatorName}>{teamName.trim()}</AppText>
+                <AppText style={s.teamCreatorMeta}>{area}</AppText>
+              </View>
+            </View>
+            {summaryRows.map(([label, value, target]) => (
+              <View key={label} style={s.settingRow}>
+                <View style={{ flex: 1 }}>
+                  <AppText style={s.meta}>{label}</AppText>
+                  <AppText style={s.team}>{value}</AppText>
+                </View>
+                <Pressable
+                  onPress={() => goTo(target)}
+                  style={s.teamStepChange}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Change ${label}`}
+                >
+                  <AppText style={s.teamStepChangeText}>Change</AppText>
+                </Pressable>
+              </View>
+            ))}
+            {saveError ? (
+              <AppText style={s.authErrorText}>{saveError}</AppText>
+            ) : null}
+          </View>
+        )}
+      </ScrollView>
+      <View style={s.teamStepFooter}>
+        {step > 0 ? (
+          <Pressable
+            onPress={goBack}
+            style={s.teamStepBack}
+            accessibilityRole="button"
+            accessibilityLabel="Previous step"
+          >
+            <Ionicons name="arrow-back" size={20} color={C.redDark} />
+            <AppText style={s.teamStepBackText}>Back</AppText>
+          </Pressable>
         ) : null}
-        <Pressable
-          style={[s.saveLineupButton, (saving || saved) && s.buttonDisabled]}
-          onPress={createTeam}
-          disabled={saving || saved}
-          accessibilityRole="button"
-          accessibilityState={{
-            disabled: saving || saved,
-            busy: saving,
-          }}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color={C.white} />
-          ) : (
-            <Ionicons name="shield-checkmark-outline" color="white" size={18} />
-          )}
-          <AppText style={s.saveLineupText}>
-            {saving ? "SAVING" : saved ? "TEAM SAVED" : "CREATE TEAM"}
-          </AppText>
-        </Pressable>
+        {current.key === "check" ? (
+          <Pressable
+            style={[s.teamStepNext, saving && s.buttonDisabled]}
+            onPress={createTeam}
+            disabled={saving}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: saving, busy: saving }}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={C.white} />
+            ) : (
+              <Ionicons name="shield-checkmark-outline" color="white" size={20} />
+            )}
+            <AppText style={s.saveLineupText}>
+              {saving ? "Saving…" : "Create team"}
+            </AppText>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={[s.teamStepNext, !stepReady && s.buttonDisabled]}
+            onPress={goNext}
+            disabled={!stepReady}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !stepReady }}
+          >
+            <AppText style={s.saveLineupText}>
+              {optionalUntouched ? "Skip for now" : "Next"}
+            </AppText>
+            <Ionicons name="arrow-forward" color="white" size={20} />
+          </Pressable>
+        )}
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -17697,20 +17522,74 @@ function App() {
 }
 
 const s = StyleSheet.create({
-  moreOptionsToggle: {
-    minHeight: 58,
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: C.line,
-    backgroundColor: C.white,
+  teamStepIntro: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 14 },
+  teamStepTitle: {
+    color: C.ink,
+    fontFamily: F.score,
+    fontSize: 30,
+    lineHeight: 34,
+    marginBottom: 6,
+  },
+  teamStepPreview: { alignItems: "center", gap: 10, paddingBottom: 18 },
+  teamStepPreviewName: {
+    color: C.ink,
+    fontFamily: F.bold,
+    fontSize: 20,
+    textAlign: "center",
+  },
+  teamStepFooter: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 10,
     paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.cream,
   },
-  moreOptionsText: { flex: 1, color: C.redDark, fontSize: 16, fontFamily: F.bold },
+  teamStepBack: {
+    minHeight: 56,
+    paddingHorizontal: 18,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: C.redDark,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  teamStepBackText: { color: C.redDark, fontFamily: F.bold, fontSize: 17 },
+  teamStepNext: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 6,
+    backgroundColor: C.red,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  teamStepChange: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  teamStepChangeText: { color: C.red, fontFamily: F.bold, fontSize: 15 },
+  teamStepDone: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+    padding: 24,
+  },
+  teamStepDoneTitle: {
+    color: C.ink,
+    fontFamily: F.score,
+    fontSize: 30,
+    textAlign: "center",
+  },
   listenButton: {
     width: 48,
     height: 48,
@@ -19249,25 +19128,6 @@ const s = StyleSheet.create({
     fontFamily: F.bold,
     paddingLeft: 6,
   },
-  inviteComposer: { flexDirection: "row", gap: 8 },
-  inviteInput: {
-    flex: 1,
-    minHeight: 46,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.line,
-    backgroundColor: "white",
-    paddingHorizontal: 12,
-    color: C.ink,
-  },
-  inviteButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 4,
-    backgroundColor: C.red,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   invitedRow: {
     minHeight: 60,
     flexDirection: "row",
@@ -19277,16 +19137,6 @@ const s = StyleSheet.create({
     borderColor: C.line,
   },
   formFooter: { paddingHorizontal: 16, paddingBottom: 18 },
-  createdBanner: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 11,
-    padding: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#DCEFE3",
-  },
   teamCreatorHero: {
     marginHorizontal: 16,
     marginBottom: 8,
@@ -19297,15 +19147,8 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 13,
   },
-  jerseyPreview: { width: 72, alignItems: "center" },
   teamCreatorName: { color: "white", fontSize: 16, fontFamily: F.black },
   teamCreatorMeta: { color: "#CAD2E4", fontSize: 8, marginTop: 4 },
-  teamCreatorCoach: {
-    color: C.gold,
-    fontSize: 8,
-    fontFamily: F.bold,
-    marginTop: 7,
-  },
   formTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -19438,15 +19281,6 @@ const s = StyleSheet.create({
     gap: 11,
     borderBottomWidth: 1,
     borderColor: C.line,
-  },
-  checkCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: C.line,
-    alignItems: "center",
-    justifyContent: "center",
   },
   checkCircleActive: {
     width: 28,
@@ -19893,22 +19727,6 @@ const s = StyleSheet.create({
     borderColor: C.line,
     marginTop: 18,
     paddingTop: 18,
-  },
-  setupEmpty: {
-    minHeight: 120,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-  inlineSuccess: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#DCEFE3",
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    marginBottom: 8,
   },
   buttonDisabled: { opacity: 0.45 },
   leagueSafety: {
