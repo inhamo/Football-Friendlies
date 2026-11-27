@@ -72,7 +72,6 @@ import {
   createLeagueRecord,
   createOpportunityRecord,
   createSafeguardingReport,
-  createSponsorshipProposal,
   createNotifications,
   completeMatchRecord,
   createTeamChallenge,
@@ -752,44 +751,6 @@ const initialRoleData = {
     subscribed: false,
     availability: false,
   },
-  Sponsor: {
-    name: "",
-    organization: "",
-    sector: "",
-    area: "",
-    website: "",
-    sponsorTypes: [],
-    logoUri: null,
-    contactVisible: false,
-    verificationRequested: false,
-    sponsorshipHistory: [],
-    impactFocus: [],
-    objectives: [],
-    rightsWanted: [],
-    proposals: [],
-    watchlist: [],
-    safeguardingAccepted: false,
-    interests: [],
-    budget: "",
-  },
-  Scout: {
-    name: "",
-    organization: "",
-    credential: "",
-    area: "",
-    specialties: [],
-    philosophy: "",
-    licenceNumber: "",
-    yearsExperience: "",
-    safeguardingAccepted: false,
-    notes: "",
-    profileImage: null,
-    contactVisible: false,
-    verificationRequested: false,
-    reports: [],
-    watchlist: [],
-    attending: [],
-  },
 };
 const clubLogos = {
   Scottland: require("./assets/scottland.png"),
@@ -1102,19 +1063,6 @@ const parseSquadPlayer = (entry) => {
     number,
   };
 };
-const archivedFantasyPlayers = [
-  ["Tafiremutsa", "Scottland", "GK", 6],
-  ["Nettey", "Dynamos", "DEF", 5],
-  ["Muduhwa", "Highlanders", "DEF", 4],
-  ["Murwira", "Scottland", "DEF", 7],
-  ["Chaziya", "Simba Bhora", "DEF", 3],
-  ["Billiat", "Scottland", "MID", 12],
-  ["Nyahwa", "Dynamos", "MID", 6],
-  ["Madhanhanga", "Ngezi Platinum", "MID", 5],
-  ["Wadi", "CAPS United", "MID", 8],
-  ["Navaya", "Hard Rock", "FWD", 14],
-  ["Agyemang", "Dynamos", "FWD", 11],
-];
 const signingNews = [];
 const fixtures = [];
 const communityTeams = [];
@@ -1134,7 +1082,6 @@ const emptyBenchSlots = Array.from({ length: 5 }, (_, index) => ({
 }));
 const table = [];
 const squads = {};
-const fantasyPlayers = [];
 const scorerRecords = [];
 const normalizeScorerTeam = (name) => {
   const aliases = {
@@ -1985,338 +1932,6 @@ function Latest() {
               </AppText>
             </View>
           </View>
-        ))}
-      </View>
-    </ScrollView>
-  );
-}
-function Fantasy() {
-  return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <BrandHeader title="FANTASY PSL" />
-      <View style={s.darkHead}>
-        <Label>GAMEWEEK 27</Label>
-        <AppText style={s.heroTitle}>
-          Your team.{`\n`}Your bragging rights.
-        </AppText>
-        <View style={s.stats}>
-          {[
-            ["POINTS", "68"],
-            ["OVERALL", "12,481"],
-            ["BUDGET", "$24.5m"],
-          ].map((x) => (
-            <View key={x[0]}>
-              <AppText style={s.meta}>{x[0]}</AppText>
-              <AppText style={s.stat}>{x[1]}</AppText>
-            </View>
-          ))}
-        </View>
-      </View>
-      <View style={s.pitch}>
-        <View style={s.half} />
-        {[
-          ["Ncube", "HI"],
-          ["Mapfumo", "DY"],
-          ["Moyo", "FP"],
-          ["Mushure", "CU"],
-          ["Banda", "SC"],
-          ["Chikuhwa", "SB"],
-          ["Mutizwa", "NP"],
-        ].map((p, i) => (
-          <View
-            key={p[0]}
-            style={[
-              s.player,
-              {
-                left: [168, 35, 168, 300, 45, 168, 290][i],
-                top: [18, 125, 115, 125, 260, 245, 260][i],
-              },
-            ]}
-          >
-            <View style={s.shirt}>
-              <AppText style={s.shirtText}>{p[1]}</AppText>
-            </View>
-            <AppText style={s.playerName}>{p[0]}</AppText>
-          </View>
-        ))}
-      </View>
-      <View style={s.content}>
-        <Pressable
-          style={s.wideButton}
-          onPress={() =>
-            Alert.alert(
-              "Squad editor",
-              "Select any player on the pitch to edit your fantasy squad.",
-            )
-          }
-        >
-          <Ionicons name="people" color="white" size={18} />
-          <AppText style={s.primaryText}>Edit squad</AppText>
-        </Pressable>
-        <Pressable
-          style={s.outlineButton}
-          onPress={() =>
-            Alert.alert(
-              "Fantasy leagues",
-              "Your leagues are listed on the Fantasy home screen.",
-            )
-          }
-        >
-          <Ionicons name="stats-chart" size={18} />
-          <AppText style={s.buttonText}>View leagues</AppText>
-        </Pressable>
-        <AppText style={[s.meta, { textAlign: "center" }]}>
-          Deadline: Sat 19 Jul, 12:00 CAT
-        </AppText>
-      </View>
-    </ScrollView>
-  );
-}
-
-function FantasyPlayerCard({ player, compact = false }) {
-  return (
-    <View style={[s.fantasyPlayer, compact && s.fantasyPlayerCompact]}>
-      <View style={s.kitTile}>
-        <Ionicons name="shirt" size={compact ? 24 : 30} color={C.red} />
-      </View>
-      <AppText style={s.fantasyPlayerName} numberOfLines={1}>
-        {player[0]}
-      </AppText>
-      <AppText style={s.fantasyPoints}>{player[3]}</AppText>
-    </View>
-  );
-}
-
-function FantasyPitch({ close }) {
-  const rows = [
-    fantasyPlayers.slice(0, 1),
-    fantasyPlayers.slice(1, 5),
-    fantasyPlayers.slice(5, 9),
-    fantasyPlayers.slice(9, 11),
-  ];
-  return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={s.subHeader}>
-        <Pressable onPress={close} style={s.roundBack}>
-          <Ionicons name="arrow-back" size={22} />
-        </Pressable>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <AppText style={s.headerTitle}>Mbare Lions</AppText>
-          <AppText style={s.headerSub}>GAMEWEEK 23</AppText>
-        </View>
-        <Ionicons name="ellipsis-horizontal" size={22} />
-      </View>
-      <View style={s.fantasyScoreStrip}>
-        <View>
-          <AppText style={s.fantasyScore}>41</AppText>
-          <AppText style={s.fantasyScoreLabel}>AVERAGE</AppText>
-        </View>
-        <View style={s.fantasyScoreMain}>
-          <AppText style={s.fantasyScoreMainNumber}>68</AppText>
-          <AppText style={s.primaryText}>TOTAL POINTS</AppText>
-        </View>
-        <View>
-          <AppText style={s.fantasyScore}>117</AppText>
-          <AppText style={s.fantasyScoreLabel}>HIGHEST</AppText>
-        </View>
-      </View>
-      <View style={s.fantasyPitch}>
-        <View style={s.pitchBox} />
-        <View style={s.pitchCircle} />
-        {rows.map((row, index) => (
-          <View style={s.fantasyFormationRow} key={index}>
-            {row.map((player) => (
-              <FantasyPlayerCard key={player[0]} player={player} />
-            ))}
-          </View>
-        ))}
-      </View>
-      <View style={s.fantasyBench}>
-        <AppText style={s.h2}>Bench</AppText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {[
-            ["Makarati", "Dynamos", "DEF", 2],
-            ["Musona", "Scottland", "FWD", 8],
-            ["Adeogun", "Highlanders", "FWD", 5],
-            ["Chigwida", "CAPS United", "MID", 3],
-          ].map((player) => (
-            <FantasyPlayerCard compact key={player[0]} player={player} />
-          ))}
-        </ScrollView>
-      </View>
-    </ScrollView>
-  );
-}
-
-function FantasyV2() {
-  const [mode, setMode] = useState("Fantasy");
-  const [screen, setScreen] = useState("home");
-  const [panel, setPanel] = useState(null);
-  if (screen === "pitch")
-    return <FantasyPitch close={() => setScreen("home")} />;
-  if (panel) {
-    return (
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={s.subHeader}>
-          <Pressable onPress={() => setPanel(null)} style={s.roundBack}>
-            <Ionicons name="arrow-back" size={22} />
-          </Pressable>
-          <AppText style={[s.headerTitle, { flex: 1, marginLeft: 14 }]}>
-            {panel.toUpperCase()}
-          </AppText>
-        </View>
-        <View style={s.content}>
-          <View style={s.fantasyInfoHero}>
-            <Ionicons name="trophy" size={34} color="white" />
-            <AppText style={s.fantasyInfoTitle}>{panel}</AppText>
-            <AppText style={s.fantasyInfoCopy}>
-              The full {panel.toLowerCase()} workspace is ready for live data
-              and account services.
-            </AppText>
-          </View>
-          {[
-            "Overview",
-            "Gameweek 23",
-            "My selections",
-            "Rules and scoring",
-          ].map((item) => (
-            <Pressable
-              style={s.menuRow}
-              key={item}
-              onPress={() =>
-                Alert.alert(item, `Opened ${item.toLowerCase()} for ${panel}.`)
-              }
-            >
-              <AppText style={s.menuText}>{item}</AppText>
-              <Ionicons name="chevron-forward" color={C.muted} />
-            </Pressable>
-          ))}
-        </View>
-      </ScrollView>
-    );
-  }
-  return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={s.fantasyHeader}>
-        <View style={s.fantasyModeSwitch}>
-          {["Fantasy", "Challenge", "Draft"].map((item) => (
-            <Pressable
-              key={item}
-              onPress={() => setMode(item)}
-              style={[
-                s.fantasyModeButton,
-                mode === item && s.fantasyModeActive,
-              ]}
-            >
-              <AppText
-                style={[s.fantasyModeText, mode === item && { color: C.ink }]}
-              >
-                {item}
-              </AppText>
-            </Pressable>
-          ))}
-        </View>
-        {mode === "Fantasy" ? (
-          <View style={s.fantasyHeroCopy}>
-            <AppText style={s.fantasyHeroTitle}>Fantasy PSL</AppText>
-            <AppText style={s.fantasyHeroBody}>
-              Build your Zimbabwe XI. Score every matchweek.
-            </AppText>
-            <View style={s.managerLine}>
-              <View style={s.managerBadge}>
-                <AppText style={s.primaryText}>TN</AppText>
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppText style={s.fantasyTeamName}>Mbare Lions</AppText>
-                <AppText style={s.fantasyHeroBody}>
-                  Takudzwa Nhamo · Zimbabwe
-                </AppText>
-              </View>
-              <Ionicons name="arrow-forward" color="white" size={22} />
-            </View>
-            <View style={s.fantasyMetrics}>
-              <View>
-                <AppText style={s.fantasyMetricNumber}>41</AppText>
-                <AppText style={s.fantasyHeroBody}>Average</AppText>
-              </View>
-              <View>
-                <AppText style={s.fantasyMetricNumber}>68</AppText>
-                <AppText style={s.fantasyHeroBody}>Points</AppText>
-              </View>
-              <View>
-                <AppText style={s.fantasyMetricNumber}>117</AppText>
-                <AppText style={s.fantasyHeroBody}>Highest</AppText>
-              </View>
-            </View>
-            <Pressable
-              onPress={() => setScreen("pitch")}
-              style={s.fantasyManage}
-            >
-              <Ionicons name="football" color={C.red} />
-              <AppText style={s.buttonText}>View my team</AppText>
-              <Ionicons name="chevron-forward" color={C.red} />
-            </Pressable>
-          </View>
-        ) : (
-          <View style={s.fantasyHeroCopy}>
-            <AppText style={s.fantasyHeroTitle}>{mode}</AppText>
-            <AppText style={s.fantasyHeroBody}>
-              {mode === "Challenge"
-                ? "Pick a fresh team for a short competition."
-                : "Build a unique squad in a private league draft."}
-            </AppText>
-            <Pressable onPress={() => setPanel(mode)} style={s.fantasyManage}>
-              <AppText style={s.buttonText}>Open {mode}</AppText>
-              <Ionicons name="arrow-forward" color={C.red} />
-            </Pressable>
-          </View>
-        )}
-      </View>
-      <View style={s.content}>
-        {[
-          "Fixtures",
-          "Fixture difficulty rating",
-          "Player statistics",
-          "Set-piece takers",
-        ].map((item) => (
-          <Pressable
-            key={item}
-            onPress={() => setPanel(item)}
-            style={s.fantasyMenuRow}
-          >
-            <AppText style={s.menuText}>{item}</AppText>
-            <Ionicons name="chevron-forward" color={C.muted} />
-          </Pressable>
-        ))}
-        <AppText style={s.h2}>Leagues & cups</AppText>
-        <View style={s.modeSwitch}>
-          <Pressable
-            style={[s.modeButton, s.modeActive]}
-            onPress={() => setPanel("Leagues")}
-          >
-            <AppText style={s.buttonText}>Leagues</AppText>
-          </Pressable>
-          <Pressable style={s.modeButton} onPress={() => setPanel("Cups")}>
-            <AppText style={s.buttonText}>Cups</AppText>
-          </Pressable>
-        </View>
-        {[
-          "Zimbabwe Overall",
-          "Dynamos Supporters",
-          "Harare Friends League",
-        ].map((name, index) => (
-          <Pressable key={name} onPress={() => setPanel(name)} style={s.league}>
-            <View style={s.leagueIcon}>
-              <AppText style={s.primaryText}>{index + 1}</AppText>
-            </View>
-            <View style={{ flex: 1 }}>
-              <AppText style={s.team}>{name}</AppText>
-              <AppText style={s.meta}>
-                {index === 0 ? "Overall rank 12,481" : `${14 - index} managers`}
-              </AppText>
-            </View>
-            <Ionicons name="chevron-forward" color={C.muted} />
-          </Pressable>
         ))}
       </View>
     </ScrollView>
@@ -10314,31 +9929,6 @@ function LegacyCreateLeagueScreen({ close, onCreateLeague }) {
           placeholder="League name"
           placeholderTextColor={C.muted}
         />
-        <AppText style={s.formLabel}>Maximum sponsors</AppText>
-        <TextInput
-          value={maxSponsors}
-          onChangeText={(value) => setMaxSponsors(numbersOnly(value))}
-          keyboardType="number-pad"
-          style={s.formInput}
-        />
-        <Pressable
-          onPress={() => setPreferAppCreators((current) => !current)}
-          style={s.settingRow}
-        >
-          <View style={{ flex: 1 }}>
-            <AppText style={s.team}>Prefer sponsors using Grassroots</AppText>
-            <AppText style={s.meta}>
-              In-app sponsors appear first when reviewing proposals
-            </AppText>
-          </View>
-          <View
-            style={[s.toggleTrack, preferAppCreators && s.toggleTrackActive]}
-          >
-            <View
-              style={[s.toggleKnob, preferAppCreators && s.toggleKnobActive]}
-            />
-          </View>
-        </Pressable>
         <AppText style={s.formLabel}>Football format</AppText>
         <View style={s.optionWrap}>
           {["11-a-side", "7-a-side", "5-a-side"].map((item) => (
@@ -10450,31 +10040,6 @@ function LegacyCreateLeagueScreen({ close, onCreateLeague }) {
           placeholder="Optional sponsor name"
           placeholderTextColor={C.muted}
         />
-        <AppText style={s.formLabel}>Maximum sponsors</AppText>
-        <TextInput
-          value={maxSponsors}
-          onChangeText={(value) => setMaxSponsors(numbersOnly(value))}
-          keyboardType="number-pad"
-          style={s.formInput}
-        />
-        <Pressable
-          onPress={() => setPreferAppCreators((current) => !current)}
-          style={s.settingRow}
-        >
-          <View style={{ flex: 1 }}>
-            <AppText style={s.team}>Prefer in-app sponsors</AppText>
-            <AppText style={s.meta}>
-              Sponsors with saved Grassroots profiles appear first
-            </AppText>
-          </View>
-          <View
-            style={[s.toggleTrack, preferAppCreators && s.toggleTrackActive]}
-          >
-            <View
-              style={[s.toggleKnob, preferAppCreators && s.toggleKnobActive]}
-            />
-          </View>
-        </Pressable>
         <AppText style={s.formHelp}>
           Subscriptions, prize payments and sponsor income will be tracked in
           one league ledger.
@@ -10900,31 +10465,6 @@ function CreateLeagueScreen({
           placeholder="Optional"
           placeholderTextColor={C.muted}
         />
-        <AppText style={s.formLabel}>Maximum sponsors</AppText>
-        <TextInput
-          value={maxSponsors}
-          onChangeText={(value) => setMaxSponsors(numbersOnly(value))}
-          keyboardType="number-pad"
-          style={s.formInput}
-        />
-        <Pressable
-          onPress={() => setPreferAppCreators((current) => !current)}
-          style={s.settingRow}
-        >
-          <View style={{ flex: 1 }}>
-            <AppText style={s.team}>Prefer in-app sponsors</AppText>
-            <AppText style={s.meta}>
-              Sponsors with saved Grassroots profiles appear first
-            </AppText>
-          </View>
-          <View
-            style={[s.toggleTrack, preferAppCreators && s.toggleTrackActive]}
-          >
-            <View
-              style={[s.toggleKnob, preferAppCreators && s.toggleKnobActive]}
-            />
-          </View>
-        </Pressable>
       </View>
       <View style={s.formSection}>
         <AppText style={s.formSectionTitle}>Rules</AppText>
@@ -14294,12 +13834,6 @@ function MoreDetail({
               ? selectedLeague.sponsor
               : "No tournament sponsor added yet."}
           </AppText>
-          <AppText style={s.meta}>
-            Up to {selectedLeague.maxSponsors || 0} sponsors ·{" "}
-            {selectedLeague.preferAppCreators
-              ? "in app sponsors reviewed first"
-              : "open review"}
-          </AppText>
         </View>
       </ScrollView>
     );
@@ -14365,7 +13899,7 @@ function MoreDetail({
             <Ionicons name="notifications-outline" size={30} color={C.muted} />
             <AppText style={s.team}>No notifications yet</AppText>
             <AppText style={s.body}>
-              Team, player, scout, referee and sponsor requests will appear
+              Team, player and referee requests will appear
               here.
             </AppText>
           </View>
@@ -16805,7 +16339,7 @@ function GrassrootsHub({
               "Players wanted",
               "Referee wanted",
               "Open training",
-              "Trial or scout visit",
+              "Trial",
               "Community support",
             ]}
             value={opportunity.type}
@@ -16859,7 +16393,7 @@ function GrassrootsHub({
           />
           <ProfileChoiceGroup
             label="Role needed"
-            options={["Any role", "Player", "Referee", "Scout", "Sponsor"]}
+            options={["Any role", "Player", "Referee"]}
             value={opportunity.wantedRole}
             onChange={(wantedRole) =>
               setOpportunity((current) => ({ ...current, wantedRole }))
@@ -16894,7 +16428,7 @@ function GrassrootsHub({
                     ...opportunity,
                     posterRole: role,
                     youthTrial:
-                      opportunity.type === "Trial or scout visit" &&
+                      opportunity.type === "Trial" &&
                       opportunity.ageGroup.startsWith("U"),
                   }),
                 () => {
@@ -16982,7 +16516,7 @@ function GrassrootsHub({
           </View>
           <AppText style={s.formLabel}>FILTER ROLE</AppText>
           <View style={s.optionWrap}>
-            {["All roles", "Player", "Referee", "Scout", "Sponsor"].map(
+            {["All roles", "Player", "Referee"].map(
               (value) => (
                 <Pressable
                   key={value}
@@ -17518,9 +17052,9 @@ const ENTRY_ROLES = [
   ["Coach", "clipboard-outline"],
   ["Player", "football-outline"],
   ["Referee", "flag-outline"],
-  ["Sponsor", "business-outline"],
-  ["Scout", "eye-outline"],
 ];
+// Sponsor and Scout roles were retired (Nov 2026). Old saved sessions fall back to Player.
+const RETIRED_ROLES = ["Sponsor", "Scout"];
 
 const ENTRY_ROLE_DETAILS = {
   Coach: {
@@ -17534,14 +17068,6 @@ const ENTRY_ROLE_DETAILS = {
   Referee: {
     title: "Be ready for the right games",
     copy: "Share your availability, agree expectations early and build a clear match record.",
-  },
-  Sponsor: {
-    title: "Back football that is close to home",
-    copy: "Discover local teams, tournaments and players before starting a conversation.",
-  },
-  Scout: {
-    title: "Follow local potential",
-    copy: "Search by area and football details, keep a watchlist and request a safe introduction.",
   },
 };
 
@@ -17819,7 +17345,7 @@ function MarketingWelcome({
                 A useful view for every role.
               </AppText>
               <AppText style={s.marketingOpportunityText}>
-                Players, coaches, referees, scouts and sponsors see the same
+                Players, coaches and referees see the same
                 football from the view that matters to them. Shared profiles
                 reduce repeated work; permissions keep private work private.
               </AppText>
@@ -18741,33 +18267,9 @@ function RefereeProfile({ data, update, onSave, saving = false, saved = false })
 
 function ProfilePortfolio({ role, data, update, view, setView }) {
   const [draft, setDraft] = useState("");
-  const [reportPlayer, setReportPlayer] = useState("");
-  const [recommendation, setRecommendation] = useState("Follow");
-  const [rating, setRating] = useState("Good");
   const addItem = () => {
     if (!draft.trim()) return;
-    if (role === "Sponsor")
-      update({
-        sponsorshipHistory: [...data.sponsorshipHistory, draft.trim()],
-      });
-    else update({ achievements: [...data.achievements, draft.trim()] });
-    setDraft("");
-  };
-  const saveReport = () => {
-    if (!reportPlayer) return;
-    update({
-      reports: [
-        {
-          id: Date.now().toString(),
-          player: reportPlayer,
-          recommendation,
-          rating,
-          note: draft.trim() || "No additional note",
-          created: "Today",
-        },
-        ...data.reports,
-      ],
-    });
+    update({ achievements: [...data.achievements, draft.trim()] });
     setDraft("");
   };
   return (
@@ -18913,143 +18415,6 @@ function ProfilePortfolio({ role, data, update, view, setView }) {
             </View>
           </>
         ) : null}
-        {role === "Sponsor" ? (
-          <>
-            <AppText style={s.settingsGroupTitle}>SPONSORSHIP HISTORY</AppText>
-            {data.sponsorshipHistory.map((item, index) => (
-              <View key={`${item}-${index}`} style={s.portfolioRow}>
-                <Ionicons name="ribbon-outline" size={21} color={C.red} />
-                <AppText style={[s.team, { flex: 1 }]}>{item}</AppText>
-                <Pressable
-                  onPress={() =>
-                    update({
-                      sponsorshipHistory: data.sponsorshipHistory.filter(
-                        (_, itemIndex) => itemIndex !== index,
-                      ),
-                    })
-                  }
-                >
-                  <Ionicons name="close" size={20} color={C.muted} />
-                </Pressable>
-              </View>
-            ))}
-            <View style={s.profileAddRow}>
-              <TextInput
-                value={draft}
-                onChangeText={setDraft}
-                placeholder="Add previous sponsorship"
-                style={s.chatInput}
-              />
-              <Pressable
-                disabled={!draft.trim()}
-                onPress={addItem}
-                style={[s.roleMiniButton, !draft.trim() && s.buttonDisabled]}
-              >
-                <Ionicons name="add" color="white" size={18} />
-              </Pressable>
-            </View>
-            <ProfileChoiceGroup
-              multiple
-              label="Impact you want to support"
-              options={[
-                "Youth participation",
-                "Women’s football",
-                "Equipment",
-                "Safe grounds",
-                "Travel",
-              ]}
-              value={data.impactFocus}
-              onChange={(impactFocus) => update({ impactFocus })}
-            />
-            <View style={s.profilePrivacyNote}>
-              <Ionicons name="analytics-outline" size={21} color={C.red} />
-              <AppText style={[s.body, { flex: 1 }]}>
-                Confirmed sponsorships will receive reach, participation and
-                delivery reports, not vanity impressions.
-              </AppText>
-            </View>
-          </>
-        ) : null}
-        {role === "Scout" ? (
-          <>
-            <AppText style={s.settingsGroupTitle}>NEW PRIVATE REPORT</AppText>
-            <ProfileChoiceGroup
-              label="Player"
-              options={[]}
-              value={reportPlayer}
-              onChange={setReportPlayer}
-            />
-            <ProfileChoiceGroup
-              label="Current level"
-              options={["Developing", "Good", "Standout"]}
-              value={rating}
-              onChange={setRating}
-            />
-            <ProfileChoiceGroup
-              label="Recommendation"
-              options={["Pass", "Follow", "Contact club"]}
-              value={recommendation}
-              onChange={setRecommendation}
-            />
-            <AppText style={s.formLabel}>Private observation</AppText>
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Strengths, risks and next action"
-              multiline
-              style={[s.formInput, s.profileMultiline]}
-            />
-            <Pressable
-              onPress={saveReport}
-              disabled={!reportPlayer}
-              style={[s.saveLineupButton, !reportPlayer && s.buttonDisabled]}
-            >
-              <Ionicons name="lock-closed-outline" size={18} color="white" />
-              <AppText style={s.saveLineupText}>SAVE PRIVATE REPORT</AppText>
-            </Pressable>
-            <AppText style={s.settingsGroupTitle}>SAVED REPORTS</AppText>
-            {data.reports.length ? (
-              data.reports.map((report) => (
-                <View key={report.id} style={s.scoutReport}>
-                  <View style={s.scoutReportHead}>
-                    <AppText style={s.team}>{report.player}</AppText>
-                    <AppText style={s.communityStatus}>
-                      {report.recommendation}
-                    </AppText>
-                  </View>
-                  <AppText style={s.meta}>
-                    {report.rating} · {report.created}
-                  </AppText>
-                  <AppText style={s.body}>{report.note}</AppText>
-                  <Pressable
-                    onPress={() =>
-                      update({
-                        reports: data.reports.filter(
-                          (item) => item.id !== report.id,
-                        ),
-                      })
-                    }
-                    style={s.scoutReportDelete}
-                  >
-                    <AppText style={s.communitySeeAll}>Delete report</AppText>
-                  </Pressable>
-                </View>
-              ))
-            ) : (
-              <View style={s.emptyState}>
-                <Ionicons
-                  name="document-lock-outline"
-                  size={28}
-                  color={C.muted}
-                />
-                <AppText style={s.team}>No reports yet</AppText>
-                <AppText style={s.meta}>
-                  Reports are visible only to this scout account.
-                </AppText>
-              </View>
-            )}
-          </>
-        ) : null}
       </View>
     </ScrollView>
   );
@@ -19060,8 +18425,8 @@ function PublicProfilePreview({ role, data, view, setView, onEdit }) {
   const [playerStatsPeriod, setPlayerStatsPeriod] = useState("All time");
   const playerPeriodStats = playerStatsForPeriod(data, playerStatsPeriod);
   const title =
-    role === "Sponsor" ? data.organization : data.name || "Incomplete profile";
-  const imageUri = role === "Sponsor" ? data.logoUri : data.profileImage;
+    data.name || "Incomplete profile";
+  const imageUri = data.profileImage;
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
       {onEdit ? (
@@ -19097,9 +18462,7 @@ function PublicProfilePreview({ role, data, view, setView, onEdit }) {
         <AppText style={s.publicProfileMeta}>
           {playerLike
             ? `${data.position} · ${data.area}`
-            : role === "Sponsor"
-              ? `${data.sector} · ${data.area}`
-              : `${data.credential} · ${data.area}`}
+            : `${data.credential} · ${data.area}`}
         </AppText>
         {data.verificationRequested ? (
           <View style={s.publicPending}>
@@ -19220,73 +18583,7 @@ function PublicProfilePreview({ role, data, view, setView, onEdit }) {
               </AppText>
             )}
           </>
-        ) : role === "Sponsor" ? (
-          <>
-            <AppText style={s.settingsGroupTitle}>LOOKING TO SUPPORT</AppText>
-            <View style={s.optionWrap}>
-              {data.sponsorTypes.map((item) => (
-                <View key={item} style={s.publicTag}>
-                  <AppText style={s.formChoiceText}>{item}</AppText>
-                </View>
-              ))}
-            </View>
-            <AppText style={s.publicProfileSummary}>
-              {data.impactFocus.join(" · ") || "Impact preferences not added."}
-            </AppText>
-            <AppText style={s.settingsGroupTitle}>PARTNERSHIP BRIEF</AppText>
-            <View style={s.settingRow}>
-              <AppText style={s.meta}>OBJECTIVES</AppText>
-              <AppText
-                style={[s.team, { maxWidth: "62%", textAlign: "right" }]}
-              >
-                {data.objectives.join(" · ")}
-              </AppText>
-            </View>
-            <View style={s.settingRow}>
-              <AppText style={s.meta}>RIGHTS</AppText>
-              <AppText
-                style={[s.team, { maxWidth: "62%", textAlign: "right" }]}
-              >
-                {data.rightsWanted.join(" · ")}
-              </AppText>
-            </View>
-          </>
-        ) : (
-          <>
-            <AppText style={s.settingsGroupTitle}>SCOUTING FOCUS</AppText>
-            <View style={s.optionWrap}>
-              {data.specialties.map((item) => (
-                <View key={item} style={s.publicTag}>
-                  <AppText style={s.formChoiceText}>{item}</AppText>
-                </View>
-              ))}
-            </View>
-            <AppText style={s.publicProfileSummary}>{data.philosophy}</AppText>
-            <View style={s.settingRow}>
-              <AppText style={s.meta}>ORGANISATION</AppText>
-              <AppText style={s.team}>{data.organization}</AppText>
-            </View>
-            <View style={s.settingRow}>
-              <AppText style={s.meta}>EXPERIENCE</AppText>
-              <AppText style={s.team}>{data.yearsExperience} years</AppText>
-            </View>
-            <View style={s.settingRow}>
-              <AppText style={s.meta}>CREDENTIAL</AppText>
-              <AppText
-                style={[s.team, { maxWidth: "62%", textAlign: "right" }]}
-              >
-                {data.credential}
-              </AppText>
-            </View>
-            <View style={s.profilePrivacyNote}>
-              <Ionicons name="eye-off-outline" size={20} color={C.red} />
-              <AppText style={[s.body, { flex: 1 }]}>
-                Private reports, notes and watchlists are never shown on this
-                public profile.
-              </AppText>
-            </View>
-          </>
-        )}
+        ) : null}
         <RoleAction
           icon={
             data.contactVisible ? "chatbubble-outline" : "lock-closed-outline"
@@ -19313,7 +18610,7 @@ function PublicProfilePreview({ role, data, view, setView, onEdit }) {
 }
 
 function SavedRolePreview({ role, data, onEdit }) {
-  if (role === "Player" || role === "Sponsor" || role === "Scout")
+  if (role === "Player")
     return <PublicProfilePreview role={role} data={data} onEdit={onEdit} />;
   const title = data.name || `${role} profile`;
   const rows =
@@ -19448,22 +18745,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
             data.dateOfBirth &&
             data.area?.trim(),
         )
-      : role === "Sponsor"
-        ? Boolean(
-            data.name?.trim() &&
-              data.organization?.trim() &&
-              data.sector &&
-              data.area?.trim() &&
-              data.sponsorTypes?.length,
-          )
-        : role === "Scout"
-          ? Boolean(
-              data.name?.trim() &&
-                data.organization?.trim() &&
-                data.area?.trim() &&
-                data.specialties?.length,
-            )
-          : Boolean(data.name?.trim());
+      : Boolean(data.name?.trim());
   const saveProfile = async () => {
     if (!requiredComplete) {
       Alert.alert(
@@ -19518,7 +18800,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
       />
     );
   const playerLike = role === "Player";
-  const imageUri = role === "Sponsor" ? data.logoUri : data.profileImage;
+  const imageUri = data.profileImage;
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted)
@@ -19535,13 +18817,11 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
     });
     if (!result.canceled)
       update(
-        role === "Sponsor"
-          ? { logoUri: result.assets[0].uri }
-          : { profileImage: result.assets[0].uri },
+        { profileImage: result.assets[0].uri },
       );
   };
   const requestVerification = () => {
-    if (!data.name?.trim() || (role !== "Player" && !data.organization?.trim()))
+    if (!data.name?.trim())
       return Alert.alert(
         "Complete the profile first",
         "Add the required identity details before requesting verification.",
@@ -19549,7 +18829,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
     update({ verificationRequested: true });
   };
   const title =
-    role === "Sponsor" ? data.organization : data.name || `${role} profile`;
+    data.name || `${role} profile`;
   if (view === "Portfolio")
     return (
       <ProfilePortfolio
@@ -19592,9 +18872,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
           <AppText style={s.meta}>
             {playerLike
               ? `${data.position} · ${data.club || "Looking for a club"}`
-              : role === "Sponsor"
-                ? `${data.sector} · ${data.area}`
-                : `${data.organization} · ${data.area}`}
+              : data.area || "Area not added"}
           </AppText>
           <View style={s.profileVerificationLine}>
             <Ionicons
@@ -19615,14 +18893,10 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
       <View style={s.communityListSection}>
         <AppText style={s.requiredHint}>* Required to save your profile</AppText>
         <AppText style={s.settingsGroupTitle}>
-          {playerLike
-            ? "FOOTBALL IDENTITY"
-            : role === "Sponsor"
-              ? "ORGANISATION"
-              : "SCOUT IDENTITY"}
+          {playerLike ? "FOOTBALL IDENTITY" : "YOUR DETAILS"}
         </AppText>
         <FormLabel required>
-          {role === "Sponsor" ? "Contact person" : "Full name"}
+          {"Full name"}
         </FormLabel>
         <TextInput
           value={data.name}
@@ -19632,23 +18906,6 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
           placeholder="Full name"
           style={s.formInput}
         />
-        {role === "Sponsor" || role === "Scout" ? (
-          <>
-            <FormLabel required>Organisation</FormLabel>
-            <TextInput
-              value={data.organization}
-              onChangeText={(organization) => {
-                update({ organization });
-              }}
-              placeholder={
-                role === "Sponsor"
-                  ? "Business or organisation"
-                  : "Club, academy or independent"
-              }
-              style={s.formInput}
-            />
-          </>
-        ) : null}
         {playerLike ? (
           <>
             <ProfileChoiceGroup
@@ -19811,7 +19068,7 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
               ["consentPhotos", "Photos"],
               ["consentVideos", "Videos"],
               ["consentTransport", "Team transport"],
-              ["consentTrials", "Trials and scouting"],
+              ["consentTrials", "Club trials"],
             ].map(([key, label]) => (
               <Pressable
                 key={key}
@@ -19831,205 +19088,6 @@ function RoleProfile({ role, data, update, onSaveProfile }) {
                 />
               </Pressable>
             ))}
-          </>
-        ) : null}
-        {role === "Sponsor" ? (
-          <>
-            <ProfileChoiceGroup
-              label="Sector"
-              required
-              options={[
-                "Retail",
-                "Finance",
-                "Health",
-                "Transport",
-                "Hospitality",
-              ]}
-              value={data.sector}
-              onChange={(sector) => update({ sector })}
-            />
-            <FormLabel required>Operating area</FormLabel>
-            <TextInput
-              value={data.area}
-              onChangeText={(area) => update({ area })}
-              placeholder="City or coverage area"
-              style={s.formInput}
-            />
-            <AppText style={s.formLabel}>Website or public page</AppText>
-            <TextInput
-              value={data.website}
-              onChangeText={(website) => update({ website })}
-              autoCapitalize="none"
-              placeholder="https://"
-              style={s.formInput}
-            />
-            <ProfileChoiceGroup
-              multiple
-              label="Interested in sponsoring"
-              required
-              options={["Kits", "Matches", "Leagues", "Youth", "Grounds"]}
-              value={data.sponsorTypes}
-              onChange={(sponsorTypes) => update({ sponsorTypes })}
-            />
-            <ProfileChoiceGroup
-              multiple
-              label="Partnership objectives"
-              options={[
-                "Community trust",
-                "Local awareness",
-                "Sales",
-                "Staff engagement",
-                "Social impact",
-              ]}
-              value={data.objectives}
-              onChange={(objectives) => update({ objectives })}
-            />
-            <ProfileChoiceGroup
-              multiple
-              label="Rights you need"
-              options={[
-                "Kit branding",
-                "Matchday mentions",
-                "Content",
-                "Hospitality",
-                "Naming rights",
-              ]}
-              value={data.rightsWanted}
-              onChange={(rightsWanted) => update({ rightsWanted })}
-            />
-            <AppText style={s.formLabel}>Typical budget (USD)</AppText>
-            <TextInput
-              value={data.budget}
-              onChangeText={(budget) => update({ budget: numbersOnly(budget) })}
-              keyboardType="numeric"
-              style={s.formInput}
-            />
-            <Pressable
-              onPress={() =>
-                update({ safeguardingAccepted: !data.safeguardingAccepted })
-              }
-              style={s.settingRow}
-            >
-              <View style={{ flex: 1 }}>
-                <AppText style={s.team}>Responsible activation pledge</AppText>
-                <AppText style={s.meta}>
-                  Protect players, minors, club marks and community data
-                </AppText>
-              </View>
-              <View
-                style={[
-                  s.toggleTrack,
-                  data.safeguardingAccepted && s.toggleTrackActive,
-                ]}
-              >
-                <View
-                  style={[
-                    s.toggleKnob,
-                    data.safeguardingAccepted && s.toggleKnobActive,
-                  ]}
-                />
-              </View>
-            </Pressable>
-          </>
-        ) : null}
-        {role === "Scout" ? (
-          <>
-            <AppText style={s.formLabel}>Credential or role</AppText>
-            <TextInput
-              value={data.credential}
-              onChangeText={(credential) => update({ credential })}
-              placeholder="Scouting role or licence"
-              style={s.formInput}
-            />
-            <FormLabel required>Coverage area</FormLabel>
-            <TextInput
-              value={data.area}
-              onChangeText={(area) => update({ area })}
-              placeholder="Areas you cover"
-              style={s.formInput}
-            />
-            <ProfileChoiceGroup
-              multiple
-              label="Scouting focus"
-              required
-              options={[
-                "U18",
-                "U23",
-                "Women",
-                "Goalkeepers",
-                "Defenders",
-                "Midfielders",
-                "Forwards",
-              ]}
-              value={data.specialties}
-              onChange={(specialties) => update({ specialties })}
-            />
-            <AppText style={s.formLabel}>Private scouting brief</AppText>
-            <TextInput
-              value={data.notes}
-              onChangeText={(notes) => update({ notes })}
-              placeholder="What profiles are you looking for?"
-              multiline
-              style={[s.formInput, s.profileMultiline]}
-            />
-            <AppText style={s.formLabel}>Talent philosophy</AppText>
-            <TextInput
-              value={data.philosophy}
-              onChangeText={(philosophy) => update({ philosophy })}
-              placeholder="What qualities matter in your playing model?"
-              multiline
-              style={[s.formInput, s.profileMultiline]}
-            />
-            <AppText style={s.formLabel}>Licence / membership number</AppText>
-            <TextInput
-              value={data.licenceNumber}
-              onChangeText={(licenceNumber) => update({ licenceNumber })}
-              style={s.formInput}
-            />
-            <AppText style={s.formLabel}>Years scouting</AppText>
-            <TextInput
-              value={data.yearsExperience}
-              onChangeText={(yearsExperience) =>
-                update({
-                  yearsExperience: yearsExperience.replace(/[^0-9]/g, ""),
-                })
-              }
-              keyboardType="numeric"
-              style={s.formInput}
-            />
-            <Pressable
-              onPress={() =>
-                update({ safeguardingAccepted: !data.safeguardingAccepted })
-              }
-              style={s.settingRow}
-            >
-              <View style={{ flex: 1 }}>
-                <AppText style={s.team}>Safeguarding declaration</AppText>
-                <AppText style={s.meta}>
-                  Required before contacting youth players or clubs
-                </AppText>
-              </View>
-              <View
-                style={[
-                  s.toggleTrack,
-                  data.safeguardingAccepted && s.toggleTrackActive,
-                ]}
-              >
-                <View
-                  style={[
-                    s.toggleKnob,
-                    data.safeguardingAccepted && s.toggleKnobActive,
-                  ]}
-                />
-              </View>
-            </Pressable>
-            <View style={s.profilePrivacyNote}>
-              <Ionicons name="lock-closed-outline" size={20} color={C.red} />
-              <AppText style={[s.body, { flex: 1 }]}>
-                Your brief and watchlist remain private. Players only see your
-                verified public identity.
-              </AppText>
-            </View>
           </>
         ) : null}
         <Pressable
@@ -20530,14 +19588,12 @@ function RoleWorkspace({
   notifications = [],
   onClearNotification,
   leagues = [],
-  onSponsorCompetition,
   onStartDirectChat,
   onOpenPublicRoute,
 }) {
   const [detail, setDetail] = useState(null);
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
-  const [scoutFilter, setScoutFilter] = useState("All");
   const [selectedPrivateChat, setSelectedPrivateChat] = useState(null);
   const [privateMessages, setPrivateMessages] = useState([]);
   const [privateChatSending, setPrivateChatSending] = useState(false);
@@ -21060,221 +20116,6 @@ function RoleWorkspace({
         </View>
       </ScrollView>
     );
-  if (section === "Campaigns")
-    return (
-      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
-        <RoleHeader role={role} title="Sponsorship campaigns" />
-        <View style={s.communityListSection}>
-          <AppText style={s.settingsGroupTitle}>TEAMS TO SUPPORT</AppText>
-          {prioritizeByLocation(teams, data.area)
-            .slice(0, 8)
-            .map((candidate) => (
-              <View style={s.teamDiscoveryRow} key={candidate.id}>
-                <CrestPreview
-                  shape={candidate.crest?.shape || 0}
-                  color={candidate.crest?.color || C.redDark}
-                  label={candidate.crest?.label || initials(candidate.name)}
-                  small
-                />
-                <View style={{ flex: 1 }}>
-                  <AppText style={s.team}>{candidate.name}</AppText>
-                  <AppText style={s.meta}>
-                    {candidate.area || "Area not added"}
-                  </AppText>
-                </View>
-                <Pressable
-                  style={s.join}
-                  onPress={() =>
-                    onStartDirectChat?.({
-                      ownerId: candidate.ownerId,
-                      name: candidate.name,
-                    })
-                  }
-                >
-                  <AppText style={s.buttonText}>MESSAGE</AppText>
-                </Pressable>
-              </View>
-            ))}
-          <AppText style={s.settingsGroupTitle}>PLAYERS TO SUPPORT</AppText>
-          {publicProfiles
-            .filter((profile) => profile.role === "Player")
-            .slice(0, 8)
-            .map((profile) => {
-              const watched = (data.watchlist || []).includes(profile.id);
-              return (
-                <PersonSearchCard
-                  key={`sponsor-${profile.id}`}
-                  profile={profile}
-                  status={watched ? "ON YOUR WATCHLIST" : "PLAYER PROFILE"}
-                  teamName={profile.club || ""}
-                  action={
-                    <Pressable
-                      style={[
-                        s.roleMiniButton,
-                        watched && s.roleMiniButtonDone,
-                      ]}
-                      onPress={() => toggleList("watchlist", profile.id)}
-                    >
-                      <AppText style={s.roleMiniButtonText}>
-                        {watched ? "REMOVE" : "WATCH"}
-                      </AppText>
-                    </Pressable>
-                  }
-                  secondaryAction={
-                    <Pressable
-                      style={s.outlineButton}
-                      onPress={() => onStartDirectChat?.(profile)}
-                    >
-                      <AppText style={s.buttonText}>MESSAGE</AppText>
-                    </Pressable>
-                  }
-                />
-              );
-            })}
-          <AppText style={s.settingsGroupTitle}>OTHER SPONSORS</AppText>
-          {publicProfiles
-            .filter(
-              (profile) =>
-                profile.role === "Sponsor" && profile.ownerId !== currentUid,
-            )
-            .map((profile) => (
-              <PersonSearchCard
-                key={profile.id}
-                profile={profile}
-                status="SPONSOR PROFILE"
-                teamName={profile.organization || profile.sector || ""}
-              />
-            ))}
-          <AppText style={s.settingsGroupTitle}>
-            TOURNAMENT OPPORTUNITIES
-          </AppText>
-          {leagues.map((league) => {
-            const proposed = data.proposals.includes(league.id);
-            return (
-              <View style={s.roleFixture} key={league.id}>
-                <AppText style={s.assignmentTeams}>{league.name}</AppText>
-                <AppText style={s.body}>
-                  {league.competitionType} · {league.maxSponsors || 0} sponsor
-                  places
-                </AppText>
-                <AppText style={s.meta}>
-                  {league.preferAppCreators
-                    ? "Grassroots sponsors reviewed first"
-                    : "Open sponsorship review"}
-                </AppText>
-                <Pressable
-                  disabled={proposed}
-                  style={[s.saveLineupButton, proposed && s.buttonDisabled]}
-                  onPress={() => {
-                    onSponsorCompetition?.(league);
-                    update({
-                      proposals: [...new Set([...data.proposals, league.id])],
-                    });
-                  }}
-                >
-                  <AppText style={s.saveLineupText}>
-                    {proposed ? "PROPOSAL SENT" : "SPONSOR TOURNAMENT"}
-                  </AppText>
-                </Pressable>
-              </View>
-            );
-          })}
-          {!leagues.length ? (
-            <View style={s.emptyState}>
-              <Ionicons name="heart-outline" size={30} color={C.muted} />
-              <AppText style={s.team}>No campaigns yet</AppText>
-            </View>
-          ) : null}
-        </View>
-      </ScrollView>
-    );
-  if (section === "Players" || section === "Watchlist") {
-    const availablePlayers = prioritizeByLocation(
-      publicProfiles.filter(
-        (profile) =>
-          profile.role === "Player" &&
-          (section !== "Watchlist" || data.watchlist.includes(profile.id)),
-      ),
-      data.area,
-    );
-    return (
-      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
-        <RoleHeader
-          role={role}
-          title={
-            section === "Watchlist" ? "Your watchlist" : "Players to watch"
-          }
-        />
-        <View style={s.communityListSection}>
-          {section === "Watchlist" ? (
-            <Pressable style={s.menu} onPress={() => setDetail("private-chat")}>
-              <View style={s.utilityIcon}>
-                <Ionicons name="chatbubbles-outline" size={21} color={C.red} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppText style={s.team}>Private chats</AppText>
-                <AppText style={s.meta}>
-                  Continue conversations with players and teams
-                </AppText>
-              </View>
-              <AppText style={s.bestMatch}>
-                {conversations.filter((item) => item.archived !== true).length}
-              </AppText>
-            </Pressable>
-          ) : null}
-          {availablePlayers.map((profile) => {
-            const watched = data.watchlist.includes(profile.id);
-            return (
-              <PersonSearchCard
-                key={profile.id}
-                profile={profile}
-                status={watched ? "ON YOUR WATCHLIST" : "AVAILABLE TO WATCH"}
-                teamName={profile.club || ""}
-                action={
-                  <Pressable
-                    onPress={() => toggleList("watchlist", profile.id)}
-                    style={[s.roleMiniButton, watched && s.roleMiniButtonDone]}
-                  >
-                    <AppText style={s.roleMiniButtonText}>
-                      {watched ? "REMOVE" : "SAVE"}
-                    </AppText>
-                  </Pressable>
-                }
-                secondaryAction={
-                  <Pressable
-                    style={s.outlineButton}
-                    onPress={() => onStartDirectChat?.(profile)}
-                  >
-                    <Ionicons
-                      name="chatbubble-outline"
-                      size={17}
-                      color={C.red}
-                    />
-                    <AppText style={s.buttonText}>MESSAGE</AppText>
-                  </Pressable>
-                }
-              />
-            );
-          })}
-          {!availablePlayers.length ? (
-            <View style={s.emptyState}>
-              <Ionicons name="people-outline" size={30} color={C.muted} />
-              <AppText style={s.team}>
-                {section === "Watchlist"
-                  ? "Your watchlist is empty"
-                  : "No players yet"}
-              </AppText>
-              <AppText style={s.body}>
-                {section === "Watchlist"
-                  ? "Players you save will appear here."
-                  : "Verified player profiles will appear here."}
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-      </ScrollView>
-    );
-  }
   if (section === "Teams" && playerLike)
     return (
       <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
@@ -21295,11 +20136,7 @@ function RoleWorkspace({
     const active =
       role === "Referee"
         ? data.volunteered.includes(match)
-        : role === "Sponsor"
-          ? data.interests.includes(match)
-          : role === "Scout"
-            ? data.attending.includes(match)
-            : data.rsvp;
+        : data.rsvp;
     return (
       <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
         <RoleHeader role={role} title="Upcoming matches" />
@@ -21312,11 +20149,7 @@ function RoleWorkspace({
               onPress={() =>
                 role === "Referee"
                   ? toggleList("volunteered", match)
-                  : role === "Sponsor"
-                    ? toggleList("interests", match)
-                    : role === "Scout"
-                      ? toggleList("attending", match)
-                      : update({ rsvp: !data.rsvp })
+                  : update({ rsvp: !data.rsvp })
               }
               style={[s.saveLineupButton, active && s.saveLineupButtonSaved]}
             >
@@ -21324,14 +20157,10 @@ function RoleWorkspace({
                 {active
                   ? role === "Player"
                     ? "PLAYING"
-                    : "INTEREST SENT"
+                    : "CONFIRMED"
                   : role === "Referee"
                     ? "VOLUNTEER TO REFEREE"
-                    : role === "Sponsor"
-                      ? "SPONSOR THIS MATCH"
-                      : role === "Scout"
-                        ? "ADD TO SCOUTING PLAN"
-                        : "CONFIRM AVAILABILITY"}
+                    : "CONFIRM AVAILABILITY"}
               </AppText>
             </Pressable>
             {role === "Referee" ? (
@@ -21474,232 +20303,6 @@ function RoleWorkspace({
         </View>
       </ScrollView>
     );
-  if (section === "Campaigns")
-    return (
-      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
-        <RoleHeader role={role} title="Sponsorship campaigns" />
-        <View style={s.communityListSection}>
-          <View style={s.profilePrivacyNote}>
-            <Ionicons name="analytics-outline" size={21} color={C.red} />
-            <AppText style={[s.body, { flex: 1 }]}>
-              Every opportunity states the rights, cost range and evidence the
-              organiser must return.
-            </AppText>
-          </View>
-          {[
-            {
-              id: "youth-cup",
-              title: "Harare Youth Cup",
-              scope: "8 teams · 3 matchdays · U18",
-              ask: "USD 250 to 500",
-              rights: "Kit branding · matchday mentions",
-              report: "Attendance, clips, delivery photos",
-            },
-            {
-              id: "women-series",
-              title: "Women’s Community Series",
-              scope: "6 teams · 5 matchdays",
-              ask: "USD 400 to 800",
-              rights: "Naming rights · digital content",
-              report: "Participation, reach, player stories",
-            },
-            {
-              id: "ground-lights",
-              title: "Mbare Ground Lights",
-              scope: "Safe evening training · 4 clubs",
-              ask: "USD 900 to 1,400",
-              rights: "Ground board · launch event",
-              report: "Training hours, teams served, receipts",
-            },
-          ].map((campaign) => {
-            const proposed = data.proposals.includes(campaign.id);
-            return (
-              <View key={campaign.id} style={s.roleFixture}>
-                <AppText style={s.meta}>VERIFIED COMMUNITY OPPORTUNITY</AppText>
-                <AppText style={s.assignmentTeams}>{campaign.title}</AppText>
-                <AppText style={s.body}>{campaign.scope}</AppText>
-                <View style={s.settingRow}>
-                  <AppText style={s.meta}>INVESTMENT</AppText>
-                  <AppText style={s.team}>{campaign.ask}</AppText>
-                </View>
-                <View style={s.settingRow}>
-                  <AppText style={s.meta}>RIGHTS</AppText>
-                  <AppText
-                    style={[s.team, { maxWidth: "62%", textAlign: "right" }]}
-                  >
-                    {campaign.rights}
-                  </AppText>
-                </View>
-                <View style={s.settingRow}>
-                  <AppText style={s.meta}>REPORT BACK</AppText>
-                  <AppText
-                    style={[s.team, { maxWidth: "62%", textAlign: "right" }]}
-                  >
-                    {campaign.report}
-                  </AppText>
-                </View>
-                <Pressable
-                  onPress={() =>
-                    data.safeguardingAccepted
-                      ? update({
-                          proposals: proposed
-                            ? data.proposals.filter(
-                                (item) => item !== campaign.id,
-                              )
-                            : [...data.proposals, campaign.id],
-                        })
-                      : Alert.alert(
-                          "Responsible activation pledge",
-                          "Open Profile and accept the safeguarding and community-data pledge before starting a proposal.",
-                        )
-                  }
-                  style={[
-                    s.saveLineupButton,
-                    proposed && s.saveLineupButtonSaved,
-                    !data.safeguardingAccepted && s.buttonDisabled,
-                  ]}
-                >
-                  <AppText style={s.saveLineupText}>
-                    {!data.safeguardingAccepted
-                      ? "ACCEPT PLEDGE IN PROFILE"
-                      : proposed
-                        ? "PROPOSAL STARTED"
-                        : "START PROPOSAL"}
-                  </AppText>
-                </Pressable>
-              </View>
-            );
-          })}
-        </View>
-      </ScrollView>
-    );
-  if (section === "Players" || section === "Watchlist")
-    return (
-      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
-        <RoleHeader
-          role={role}
-          title={
-            section === "Watchlist" ? "Your watchlist" : "Players to watch"
-          }
-        />
-        <View style={s.communityListSection}>
-          {section === "Players" ? (
-            <ProfileChoiceGroup
-              label="Profile filter"
-              options={["All", "U18", "U23", "Women", "Forward"]}
-              value={scoutFilter}
-              onChange={setScoutFilter}
-            />
-          ) : null}
-          {[
-            {
-              name: "Takudzwa Nhamo",
-              age: "23",
-              group: "U23",
-              position: "Forward",
-              foot: "Right",
-              club: "Avondale Social",
-              record: "18 apps · 11 goals · 5 assists",
-              clips: 4,
-            },
-            {
-              name: "Tafadzwa Mupfumi",
-              age: "18",
-              group: "U18",
-              position: "Midfielder",
-              foot: "Left",
-              club: "Greendale Social",
-              record: "14 apps · 3 goals · 8 assists",
-              clips: 3,
-            },
-            {
-              name: "Tawanda Ncube",
-              age: "22",
-              group: "U23",
-              position: "Defender",
-              foot: "Right",
-              club: "Mbare City Boys",
-              record: "17 apps · 10 clean sheets",
-              clips: 2,
-            },
-            {
-              name: "Ruvimbo Dube",
-              age: "20",
-              group: "Women",
-              position: "Forward",
-              foot: "Both",
-              club: "Harare Queens",
-              record: "12 apps · 9 goals · 4 assists",
-              clips: 5,
-            },
-          ]
-            .filter(
-              (player) =>
-                (section !== "Watchlist" ||
-                  data.watchlist.includes(player.name)) &&
-                (scoutFilter === "All" ||
-                  player.group === scoutFilter ||
-                  player.position === scoutFilter),
-            )
-            .map((player) => {
-              const watched = data.watchlist.includes(player.name);
-              return (
-                <View key={player.name} style={s.roleFixture}>
-                  <View style={s.scoutReportHead}>
-                    <AppText style={s.communityStatus}>
-                      VERIFIED MATCH DATA
-                    </AppText>
-                    <AppText style={s.meta}>{player.clips} CLIPS</AppText>
-                  </View>
-                  <AppText style={s.assignmentTeams}>{player.name}</AppText>
-                  <AppText style={s.body}>
-                    {player.position} ·{" "}
-                    {player.foot === "Both"
-                      ? "Both feet"
-                      : `${player.foot} foot`}{" "}
-                    · age {player.age}
-                  </AppText>
-                  <AppText style={s.meta}>
-                    {player.club} · {player.record}
-                  </AppText>
-                  <View style={s.profileAddRow}>
-                    <Pressable
-                      onPress={() =>
-                        Alert.alert(
-                          `${player.name} · Player CV`,
-                          `${player.position} · ${player.foot} foot\n${player.club}\n${player.record}\n${player.clips} evidence clips available`,
-                        )
-                      }
-                      style={[s.outlineButton, { flex: 1, marginTop: 0 }]}
-                    >
-                      <AppText style={s.buttonText}>REVIEW CV</AppText>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => toggleList("watchlist", player.name)}
-                      style={[
-                        s.roleMiniButton,
-                        watched && s.roleMiniButtonDone,
-                      ]}
-                    >
-                      <AppText style={s.roleMiniButtonText}>
-                        {watched ? "SAVED" : "SAVE"}
-                      </AppText>
-                    </Pressable>
-                  </View>
-                </View>
-              );
-            })}
-          {section === "Watchlist" && !data.watchlist.length ? (
-            <View style={s.emptyState}>
-              <AppText style={s.team}>Your watchlist is empty</AppText>
-              <AppText style={s.meta}>
-                Save players from the Players tab.
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-      </ScrollView>
-    );
   if (section === "Profile")
     return (
       <RoleProfile
@@ -21833,38 +20436,6 @@ function RoleWorkspace({
               complete={data.subscribed}
             />
           ) : null}
-          {role === "Sponsor" ? (
-            <RoleAction
-              icon="heart-outline"
-              title="Sponsorship brief"
-              copy={`${data.sponsorTypes.length} opportunity types · USD ${data.budget || "0"} typical budget`}
-              action={() =>
-                Alert.alert(
-                  "Sponsorship brief",
-                  data.sponsorTypes.length
-                    ? data.sponsorTypes.join(", ")
-                    : "Add sponsorship interests from Profile.",
-                )
-              }
-              label="VIEW"
-            />
-          ) : null}
-          {role === "Scout" ? (
-            <RoleAction
-              icon="bookmark-outline"
-              title="Private watchlist"
-              copy={`${data.watchlist.length} saved players`}
-              action={() =>
-                Alert.alert(
-                  "Private watchlist",
-                  data.watchlist.length
-                    ? data.watchlist.join("\n")
-                    : "No saved players yet.",
-                )
-              }
-              label="VIEW"
-            />
-          ) : null}
           <RoleAction
             icon="document-text-outline"
             title="Terms & Conditions"
@@ -21901,18 +20472,14 @@ function RoleWorkspace({
               : "Find your football."
             : role === "Referee"
               ? "Keep the game fair."
-              : role === "Sponsor"
-                ? "Back local football."
-                : "Find the next player."}
+              : "Find your football."}
         </AppText>
         <AppText style={s.roleHomeCopy}>
           {playerLike
             ? "Games, training, club requests and your verified playing record."
             : role === "Referee"
               ? "Appointments, volunteering and your refereeing record."
-              : role === "Sponsor"
-                ? "Upcoming matches and transparent local opportunities."
-                : "Fixtures, verified players and a private watchlist."}
+              : "Games, training and your football record."}
         </AppText>
       </View>
       <View style={s.communityListSection}>
@@ -21973,18 +20540,10 @@ function RoleWorkspace({
               complete={data.availability}
             />
           </>
-        ) : role === "Sponsor" ? (
-          <View style={s.emptyState}>
-            <Ionicons name="heart-outline" size={30} color={C.muted} />
-            <AppText style={s.team}>No opportunities yet</AppText>
-            <AppText style={s.body}>
-              Verified sponsorship opportunities will appear here.
-            </AppText>
-          </View>
         ) : (
           <View style={s.emptyState}>
             <Ionicons name="eye-outline" size={30} color={C.muted} />
-            <AppText style={s.team}>Nothing to scout yet</AppText>
+            <AppText style={s.team}>Nothing here yet</AppText>
             <AppText style={s.body}>
               Verified players and fixtures will appear here.
             </AppText>
@@ -22012,6 +20571,9 @@ function App() {
     "friendlies-active-role-v5",
     null,
   );
+  useEffect(() => {
+    if (RETIRED_ROLES.includes(userRole)) setUserRole("Player");
+  }, [userRole, setUserRole]);
   const [roleData, setRoleData, dataHydrated] = usePersistentState(
     "friendlies-personal-profiles-v4",
     initialRoleData,
@@ -22692,26 +21254,15 @@ function App() {
       ["Profile", "person-outline"],
       ["More", "ellipsis-horizontal"],
     ],
-    Sponsor: [
-      ["Matches", "calendar-outline"],
-      ["Campaigns", "heart-outline"],
-      ["Home", "home"],
-      ["Watchlist", "bookmark-outline"],
-      ["More", "ellipsis-horizontal"],
-    ],
-    Scout: [
-      ["Matches", "calendar-outline"],
-      ["Players", "people-outline"],
-      ["Home", "home"],
-      ["Watchlist", "bookmark-outline"],
-      ["More", "ellipsis-horizontal"],
-    ],
   };
-  const navItems = userRole === "Coach" ? coachNav : roleNav[userRole];
-  const accountRoles =
+  const navItems =
+    userRole === "Coach" ? coachNav : roleNav[userRole] || roleNav.Player;
+  const accountRolesRaw = (
     authSession.type === "account"
       ? authSession.user.roles || [authSession.user.role]
-      : [userRole];
+      : [userRole]
+  ).filter((role) => role && !RETIRED_ROLES.includes(role));
+  const accountRoles = accountRolesRaw.length ? accountRolesRaw : ["Player"];
   const switchRole = (role) => {
     if (!accountRoles.includes(role)) return;
     setUserRole(role);
@@ -22832,7 +21383,7 @@ function App() {
   const startDirectChat = async (profile) => {
     await ensureDirectConversation(currentUid, profile);
     setConversations(await loadConversations(currentUid, activeTeam?.id));
-    setTab(userRole === "Player" ? "Chat" : "Watchlist");
+    setTab(userRole === "Player" ? "Chat" : "Home");
     return profile;
   };
   const removePlayer = async (profile) => {
@@ -23369,13 +21920,6 @@ function App() {
       activeTeam?.id || "",
     );
   };
-  const sponsorCompetition = async (league) => {
-    await createSponsorshipProposal(currentUid, roleData.Sponsor || {}, league);
-    Alert.alert(
-      "Proposal sent",
-      `${league.name} can now review your sponsorship interest.`,
-    );
-  };
   const screens =
     userRole === "Coach"
       ? {
@@ -23530,7 +22074,6 @@ function App() {
                 notifications={notifications}
                 onClearNotification={dismissNotification}
                 leagues={leagues}
-                onSponsorCompetition={sponsorCompetition}
                 onStartDirectChat={startDirectChat}
                 onOpenPublicRoute={openPublicRoute}
               />
@@ -25042,24 +23585,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  fantasyHeader: { backgroundColor: C.red, padding: 12, paddingBottom: 22 },
-  fantasyModeSwitch: {
-    flexDirection: "row",
-    backgroundColor: C.redDark,
-    borderRadius: 12,
-    padding: 4,
-  },
-  fantasyModeButton: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    borderRadius: 9,
-  },
-  fantasyModeActive: { backgroundColor: "white" },
-  fantasyModeText: { color: "white", fontWeight: "800", fontSize: 12 },
-  fantasyHeroCopy: { paddingTop: 24 },
-  fantasyHeroTitle: { color: "white", fontSize: 38, fontWeight: "900" },
-  fantasyHeroBody: { color: "#E5E9F3", fontSize: 12, marginTop: 4 },
   managerLine: {
     marginTop: 22,
     paddingVertical: 16,
@@ -25078,57 +23603,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  fantasyTeamName: { color: "white", fontSize: 17, fontWeight: "900" },
-  fantasyMetrics: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    textAlign: "center",
-    paddingTop: 18,
-  },
-  fantasyMetricNumber: {
-    color: "white",
-    fontSize: 30,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  fantasyManage: {
-    marginTop: 20,
-    minHeight: 48,
-    borderRadius: 12,
-    backgroundColor: "white",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-  },
-  fantasyMenuRow: {
-    height: 58,
-    backgroundColor: "white",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderColor: C.line,
-  },
-  fantasyInfoHero: {
-    backgroundColor: C.red,
-    borderRadius: 14,
-    padding: 22,
-    marginBottom: 16,
-  },
-  fantasyInfoTitle: {
-    color: "white",
-    fontSize: 28,
-    fontWeight: "900",
-    marginTop: 16,
-  },
-  fantasyInfoCopy: {
-    color: "#E5E9F3",
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 6,
-  },
   menuRow: {
     minHeight: 58,
     backgroundColor: "white",
@@ -25139,32 +23613,6 @@ const s = StyleSheet.create({
     borderColor: C.line,
   },
   menuText: { flex: 1, fontSize: 13, fontWeight: "800" },
-  fantasyScoreStrip: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    padding: 18,
-    backgroundColor: "white",
-  },
-  fantasyScore: { fontSize: 26, fontWeight: "900", textAlign: "center" },
-  fantasyScoreLabel: { fontSize: 8, color: C.muted, fontWeight: "800" },
-  fantasyScoreMain: {
-    backgroundColor: C.red,
-    borderRadius: 12,
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  fantasyScoreMainNumber: { color: "white", fontSize: 34, fontWeight: "900" },
-  fantasyPitch: {
-    minHeight: 610,
-    backgroundColor: "#128a4a",
-    margin: 10,
-    borderRadius: 14,
-    paddingVertical: 18,
-    justifyContent: "space-between",
-    overflow: "hidden",
-  },
   pitchBox: {
     position: "absolute",
     top: 0,
@@ -25184,15 +23632,6 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#ffffffaa",
   },
-  fantasyFormationRow: {
-    minHeight: 125,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingHorizontal: 5,
-  },
-  fantasyPlayer: { width: 78, alignItems: "center" },
-  fantasyPlayerCompact: { marginRight: 10 },
   kitTile: {
     width: 56,
     height: 56,
@@ -25201,26 +23640,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  fantasyPlayerName: {
-    width: "100%",
-    backgroundColor: "white",
-    color: C.ink,
-    fontSize: 9,
-    fontWeight: "900",
-    paddingVertical: 3,
-    paddingHorizontal: 3,
-    textAlign: "center",
-  },
-  fantasyPoints: {
-    width: "100%",
-    backgroundColor: "#6f0010",
-    color: "white",
-    fontSize: 9,
-    fontWeight: "900",
-    textAlign: "center",
-    paddingVertical: 3,
-  },
-  fantasyBench: { padding: 14, backgroundColor: "#d7f0df" },
   toolHero: {
     backgroundColor: C.red,
     padding: 24,
@@ -29475,21 +27894,10 @@ const s = StyleSheet.create({
     marginTop: 14,
     marginBottom: 22,
   },
-  scoutReport: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: C.line,
-    gap: 6,
-  },
   scoutReportHead: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  scoutReportDelete: {
-    minHeight: 36,
-    alignSelf: "flex-start",
-    justifyContent: "center",
   },
   publicProfileHero: {
     paddingHorizontal: 22,

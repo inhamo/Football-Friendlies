@@ -20,8 +20,6 @@ const T = {
   "coach": ["Murairidzi", "Umqeqeshi"],
   "player": ["Mutambi", "Umdlali"],
   "referee": ["Refari", "Unompempe"],
-  "sponsor": ["Mutsigiri", "Umxhasi"],
-  "scout": ["Mutsvaga matarenda", "Umdingi wamakhono"],
   "how are you joining the game?": ["Uri kupinda sei mumutambo?", "Ungena njani emdlalweni?"],
   "choose a role": ["Sarudza basa rako", "Khetha indima yakho"],
   "choose your main football role.": ["Sarudza basa rako guru munhabvu.", "Khetha indima yakho enkulu ebholeni."],

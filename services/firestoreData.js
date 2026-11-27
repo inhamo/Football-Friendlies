@@ -1259,18 +1259,6 @@ export function subscribeMatchReviews(onChange, onError = () => {}) {
   );
 }
 
-export async function createSponsorshipProposal(ownerId, profile, league) {
-  requireFirebase();
-  return addDoc(collection(firestore, COLLECTIONS.sponsorships), {
-    ownerId,
-    profileId: profile.id || "",
-    leagueId: league.id,
-    leagueName: league.name,
-    status: "proposed",
-    createdAt: serverTimestamp(),
-  });
-}
-
 export async function savePostMatchReview(match, teamId, ownerId, review) {
   requireFirebase();
   const id = `${match.id}_${teamId}`;
