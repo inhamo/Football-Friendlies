@@ -373,7 +373,10 @@ const publicRouteFromUrl = (url) => {
       return "terms";
     if (["/privacy", "/privacy-policy", "/privacy-policy.html"].includes(normalised))
       return "privacy";
-    return "not-found";
+    // 404 page is parked for now: any other link (Expo Go's exp:// address,
+    // friendlies://join-team, unknown web paths) simply opens the app.
+    // To bring it back, return "not-found" here.
+    return null;
   } catch {
     return null;
   }
@@ -486,6 +489,7 @@ function LegalPage({ kind, onClose, onSwitch }) {
   );
 }
 
+// Parked: not shown anywhere right now (see publicRouteFromUrl). Kept for later.
 function NotFoundPage({ onHome, onOpenLegal }) {
   return (
     <SafeAreaView style={s.notFoundSafe}>
