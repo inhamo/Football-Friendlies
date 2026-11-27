@@ -7,11 +7,10 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/grassroots-kickoff.png",
       "resizeMode": "cover",
-      "backgroundColor": "#2D0A45"
+      "backgroundColor": "#0B1F4B"
     },
     "ios": {
       "supportsTablet": true
@@ -19,9 +18,8 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#2D0A45"
+        "backgroundColor": "#0B1F4B"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
