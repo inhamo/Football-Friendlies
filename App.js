@@ -17525,6 +17525,8 @@ function App() {
   );
 }
 
+// React Native 0.88 removed StyleSheet.absoluteFillObject, so we keep our own.
+const ABSOLUTE_FILL = { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 };
 const s = StyleSheet.create({
   teamStepIntro: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 14 },
   teamStepTitle: {
@@ -18015,7 +18017,7 @@ const s = StyleSheet.create({
     height: "100%",
   },
   loaderShade: {
-    ...StyleSheet.absoluteFillObject,
+    ...ABSOLUTE_FILL,
     backgroundColor: "#170A24A8",
   },
   loaderContent: {
@@ -18250,12 +18252,12 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   communityWelcomeImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...ABSOLUTE_FILL,
     width: "100%",
     height: "100%",
   },
   communityWelcomeShade: {
-    ...StyleSheet.absoluteFillObject,
+    ...ABSOLUTE_FILL,
     backgroundColor: "rgba(5, 13, 35, 0.74)",
   },
   communityWelcomeTop: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -19807,7 +19809,7 @@ const s = StyleSheet.create({
   },
   cinematicHeroWide: { minHeight: 860 },
   cinematicHeroImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...ABSOLUTE_FILL,
     width: "100%",
     height: "100%",
   },
@@ -19816,7 +19818,7 @@ const s = StyleSheet.create({
     left: "-76%",
   },
   cinematicImageShade: {
-    ...StyleSheet.absoluteFillObject,
+    ...ABSOLUTE_FILL,
     backgroundColor: "rgba(5, 13, 35, 0.43)",
   },
   cinematicLowerShade: {
